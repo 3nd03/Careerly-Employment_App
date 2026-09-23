@@ -1,12 +1,18 @@
+import functools
 import os
 import json
+import logging
 import secrets
 from datetime import datetime, timedelta
 import psycopg2
 import psycopg2.extras
+from psycopg2 import sql
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 RESULT_TABLES = {
     "skill_gap": "skill_gap_results",
@@ -20,11 +26,57 @@ RESULT_TABLES = {
     "salary_insights": "salary_insights_results",
 }
 
+_TABLE_BY_FUNC = {
+    "init_db": "schema",
+    "create_user": "users",
+    "update_user": "users",
+    "create_profile": "profiles",
+    "set_active_profile": "profiles",
+    "update_profile_label": "profiles",
+    "set_profile_cv": "profiles",
+    "update_profile": "profiles",
+    "save_cv_upload": "cv_uploads",
+    "save_cover_letter": "cover_letters",
+    "save_linkedin_message": "linkedin_messages",
+    "save_cv_translation": "cv_translations",
+    "save_application": "applications",
+    "update_application_status": "applications",
+    "create_remember_token": "remember_tokens",
+    "delete_remember_token": "remember_tokens",
+}
+
+
+def _log_db_write(func):
+    """Logs function name, record id, table name, and success/failure for every DB write."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if func.__name__ == "_insert":
+            table = args[0] if args else kwargs.get("table")
+            record_id = args[1] if len(args) > 1 else kwargs.get("profile_id")
+        else:
+            table = _TABLE_BY_FUNC.get(func.__name__, "unknown")
+            record_id = args[0] if args else next(iter(kwargs.values()), None)
+        try:
+            result = func(*args, **kwargs)
+            logger.info(
+                "function=%s id=%s table=%s status=success",
+                func.__name__, record_id, table,
+            )
+            return result
+        except Exception as e:
+            logger.error(
+                "function=%s id=%s table=%s status=failure error=%s",
+                func.__name__, record_id, table, e,
+            )
+            raise
+    return wrapper
+
 
 def get_connection():
     return psycopg2.connect(os.getenv("DATABASE_URL"))
 
 
+@_log_db_write
 def init_db():
     conn = get_connection()
     cur = conn.cursor()
@@ -137,6 +189,7 @@ def init_db():
 
 # --- users ---
 
+@_log_db_write
 def create_user(email: str, password_hash: str, display_name: str = "") -> int:
     conn = get_connection()
     cur = conn.cursor()
@@ -171,6 +224,7 @@ def get_user_by_id(user_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+@_log_db_write
 def update_user(user_id: int, **fields) -> None:
     if not fields:
         return
@@ -192,6 +246,7 @@ def update_user(user_id: int, **fields) -> None:
 
 # --- profiles ---
 
+@_log_db_write
 def create_profile(user_id: int, label: str, data: dict, cv_s3_key: str = None) -> int:
     conn = get_connection()
     cur = conn.cursor()
@@ -234,6 +289,7 @@ def get_active_profile(user_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+@_log_db_write
 def set_active_profile(user_id: int, profile_id: int) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -247,6 +303,7 @@ def set_active_profile(user_id: int, profile_id: int) -> None:
     conn.close()
 
 
+@_log_db_write
 def update_profile_label(profile_id: int, label: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -256,6 +313,7 @@ def update_profile_label(profile_id: int, label: str) -> None:
     conn.close()
 
 
+@_log_db_write
 def set_profile_cv(profile_id: int, cv_s3_key: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -265,6 +323,7 @@ def set_profile_cv(profile_id: int, cv_s3_key: str) -> None:
     conn.close()
 
 
+@_log_db_write
 def update_profile(profile_id: int, data: dict) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -279,6 +338,7 @@ def update_profile(profile_id: int, data: dict) -> None:
 
 # --- results (append-only history, keyed by profile_id) ---
 
+@_log_db_write
 def save_cv_upload(profile_id: int, s3_key: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -299,6 +359,7 @@ def save_cv_analysis(profile_id: int, result_dict) -> None:
     _insert(RESULT_TABLES["cv_analysis"], profile_id, "result", json.dumps(result_dict))
 
 
+@_log_db_write
 def save_cover_letter(profile_id: int, job_description: str, letter_text: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -316,6 +377,7 @@ def save_job_roles(profile_id: int, result_dict) -> None:
     _insert(RESULT_TABLES["job_roles"], profile_id, "result", json.dumps(result_dict))
 
 
+@_log_db_write
 def save_linkedin_message(profile_id: int, context: str, message_text: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -345,6 +407,7 @@ def save_salary_insights(profile_id: int, result_dict) -> None:
     _insert(RESULT_TABLES["salary_insights"], profile_id, "result", json.dumps(result_dict))
 
 
+@_log_db_write
 def save_cv_translation(profile_id: int, target_language: str, result: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -358,6 +421,7 @@ def save_cv_translation(profile_id: int, target_language: str, result: str) -> N
     conn.close()
 
 
+@_log_db_write
 def save_application(profile_id: int, company: str, role: str, date_applied, status: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -384,6 +448,7 @@ def get_applications(profile_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+@_log_db_write
 def update_application_status(application_id: int, status: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -393,11 +458,13 @@ def update_application_status(application_id: int, status: str) -> None:
     conn.close()
 
 
+@_log_db_write
 def _insert(table: str, profile_id: int, column: str, value) -> None:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        f"INSERT INTO {table} (profile_id, {column}) VALUES (%s, %s);",
+        sql.SQL("INSERT INTO {table} (profile_id, {column}) VALUES (%s, %s);")
+        .format(table=sql.Identifier(table), column=sql.Identifier(column)),
         (profile_id, value),
     )
     conn.commit()
@@ -426,7 +493,11 @@ def get_tools_used_count(profile_id: int) -> int:
     count = 0
     for tool_key in TOOLS_USED_KEYS:
         table = RESULT_TABLES[tool_key]
-        cur.execute(f"SELECT EXISTS(SELECT 1 FROM {table} WHERE profile_id = %s);", (profile_id,))
+        cur.execute(
+            sql.SQL("SELECT EXISTS(SELECT 1 FROM {table} WHERE profile_id = %s);")
+            .format(table=sql.Identifier(table)),
+            (profile_id,),
+        )
         if cur.fetchone()[0]:
             count += 1
     cur.close()
@@ -439,7 +510,8 @@ def get_latest(tool_key: str, profile_id: int) -> dict | None:
     conn = get_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        f"SELECT * FROM {table} WHERE profile_id = %s ORDER BY created_at DESC LIMIT 1;",
+        sql.SQL("SELECT * FROM {table} WHERE profile_id = %s ORDER BY created_at DESC LIMIT 1;")
+        .format(table=sql.Identifier(table)),
         (profile_id,),
     )
     row = cur.fetchone()
@@ -448,6 +520,7 @@ def get_latest(tool_key: str, profile_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+@_log_db_write
 def create_remember_token(user_id: int, days: int = 30) -> str:
     token = secrets.token_urlsafe(32)
     expires_at = datetime.utcnow() + timedelta(days=days)
@@ -478,6 +551,7 @@ def get_user_by_remember_token(token: str) -> dict | None:
     return dict(row) if row else None
 
 
+@_log_db_write
 def delete_remember_token(token: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
@@ -492,7 +566,8 @@ def get_history(tool_key: str, profile_id: int) -> list[dict]:
     conn = get_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        f"SELECT * FROM {table} WHERE profile_id = %s ORDER BY created_at DESC;",
+        sql.SQL("SELECT * FROM {table} WHERE profile_id = %s ORDER BY created_at DESC;")
+        .format(table=sql.Identifier(table)),
         (profile_id,),
     )
     rows = cur.fetchall()
