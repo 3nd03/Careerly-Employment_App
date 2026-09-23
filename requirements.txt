@@ -8,5 +8,6 @@ bcrypt
 streamlit-cookies-controller
 fpdf2
 fastapi
+pydantic
 uvicorn
 python-multipart

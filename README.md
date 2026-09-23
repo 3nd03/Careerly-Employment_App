@@ -15,6 +15,11 @@ An AI-powered CV and career platform built for a charity hackathon. Users go thr
 - **Job role suggestions**: three roles to go for now, three to aim for in six months.
 - **LinkedIn message generator**: short cold outreach message built from the user profile, with an optional context field for who they're messaging.
 - **Interview prep**: five role-specific questions weighted towards the user's known skill gaps.
+- **Career roadmap**: a plan from where the user is now through three months, six months, and one year out.
+- **Salary insights**: expected pay range by seniority level, the factors that move it, and negotiation tips.
+- **CV download**: rewrite an uploaded or pasted CV and download it as a formatted PDF.
+- **CV translator**: translate an uploaded or pasted CV into another language and download it as a PDF.
+- **Application tracker**: log job applications with company, role, and status (Applied, Interview, Offer, Rejected), and update status as it changes.
 - **Follow-up chat**: after using any tool, the user can ask a specific question about their result and get an answer grounded in that result and their profile.
 
 ## Setup
@@ -83,6 +88,15 @@ npm run dev -- --host
 
 Find this machine's LAN IP (`ipconfig` on Windows, look for IPv4 Address) and open `http://<LAN-IP>:3000` on the phone. The frontend's API base URL already follows whatever host it was loaded from, so this works without extra config.
 
+## Running tests
+
+```bash
+pip install pytest
+pytest
+```
+
+Tests mock the Anthropic, database, and bcrypt calls, so they run without a real API key, database, or AWS credentials. `scripts/check_db_connection.py` and `scripts/check_s3_connection.py` are separate, manual scripts that hit the real database and S3 bucket to confirm your `.env` credentials work; they are not part of the automated test suite.
+
 ## Project structure
 
 ```
@@ -98,6 +112,11 @@ app/
   job_roles.py         Job role suggestions
   linkedin_message.py  LinkedIn outreach message
   interview_prep.py    Interview question prep
+  career_roadmap.py    Career roadmap (now / 3mo / 6mo / 1yr)
+  salary_insights.py   Salary range and negotiation tips
+  cv_download.py       CV rewrite and PDF download
+  cv_translator.py     CV translation and PDF download
+  application_tracker.py  Job application log with status tracking
 
 services/
   claude_client.py     Single call_claude(prompt, system=""): all API calls go here
@@ -115,6 +134,10 @@ prompts/
   linkedin_prompt.py
   interview_prep_prompt.py
   profile_extraction_prompt.py
+  career_roadmap_prompt.py
+  salary_insights_prompt.py
+  cv_download_prompt.py
+  cv_translator_prompt.py
 
 utils/
   helpers.py           Shared profile rendering and navigation helpers
@@ -128,6 +151,10 @@ frontend/
   src/pages/           One page per route (dashboard, profile, each tool)
   src/components/      Shared UI (Layout, Card, BottomNav, Logo, ...)
   src/api/             Axios client and API calls
+
+tests/                 Automated pytest suite (mocked, no real credentials needed)
+
+scripts/               Manual scripts that hit real infrastructure (DB, S3) to verify .env credentials
 ```
 
 ## Architecture

@@ -5,6 +5,9 @@ version = "0.1.0"
 [tool.setuptools]
 packages = ["app", "services", "database", "database.migrations", "prompts", "utils", "api", "api.routers"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
