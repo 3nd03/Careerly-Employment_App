@@ -18,6 +18,7 @@ import CareerRoadmap from './pages/CareerRoadmap'
 import SalaryInsights from './pages/SalaryInsights'
 import ApplicationTracker from './pages/ApplicationTracker'
 import CvTranslator from './pages/CvTranslator'
+import TailoredCvBuilder from './pages/TailoredCvBuilder'
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -162,6 +163,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <CvTranslator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tailored-cv-builder"
+          element={
+            <ProtectedRoute>
+              <TailoredCvBuilder />
             </ProtectedRoute>
           }
         />

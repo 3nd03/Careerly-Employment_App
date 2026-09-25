@@ -19,6 +19,7 @@ from database.db_client import (
     save_application,
     get_applications,
     update_application_status,
+    save_tailored_cv,
     get_latest,
 )
 from utils.pdf import extract_pdf_text, generate_pdf
@@ -33,6 +34,7 @@ from prompts.cv_download_prompt import build_cv_download_prompt
 from prompts.career_roadmap_prompt import build_career_roadmap_prompt
 from prompts.salary_insights_prompt import build_salary_insights_prompt
 from prompts.cv_translator_prompt import build_cv_translator_prompt
+from prompts.tailored_cv_prompt import build_tailored_cv_prompt
 
 from api.dependencies import get_current_profile
 from api.schemas import (
@@ -45,6 +47,8 @@ from api.schemas import (
     ApplicationStatusUpdate,
     FollowupRequest,
     FollowupResponse,
+    TailoredCvRequest,
+    TailoredCvResponse,
 )
 
 router = APIRouter(prefix="/tools", tags=["tools"])
@@ -170,6 +174,14 @@ def run_cv_translate(payload: CVTranslateRequest, profile: dict = Depends(get_cu
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=cv_translated.pdf"},
     )
+
+
+@router.post("/tailored-cv", response_model=TailoredCvResponse)
+def run_tailored_cv(payload: TailoredCvRequest, profile: dict = Depends(get_current_profile)):
+    prompt = build_tailored_cv_prompt(profile["data"], payload.job_description, payload.cv_text)
+    result = call_claude(prompt)
+    save_tailored_cv(profile["id"], payload.job_description, result)
+    return TailoredCvResponse(result=result)
 
 
 @router.get("/applications", response_model=list[ApplicationOut])

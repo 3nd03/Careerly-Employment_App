@@ -34,6 +34,14 @@ export async function runInterviewPrep() {
   return data
 }
 
+export async function runTailoredCv(jobDescription, cvText) {
+  const { data } = await client.post('/tools/tailored-cv', {
+    job_description: jobDescription,
+    cv_text: cvText,
+  })
+  return data
+}
+
 export async function runCvDownload(cvText) {
   const { data } = await client.post(
     '/tools/cv-download',

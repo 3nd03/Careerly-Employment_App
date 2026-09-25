@@ -24,6 +24,7 @@ RESULT_TABLES = {
     "cv_download": "cv_download_results",
     "career_roadmap": "career_roadmap_results",
     "salary_insights": "salary_insights_results",
+    "tailored_cv": "tailored_cv_results",
 }
 
 _TABLE_BY_FUNC = {
@@ -43,6 +44,7 @@ _TABLE_BY_FUNC = {
     "update_application_status": "applications",
     "create_remember_token": "remember_tokens",
     "delete_remember_token": "remember_tokens",
+    "save_tailored_cv": "tailored_cv_results",
 }
 
 
@@ -180,6 +182,13 @@ def init_db():
             token TEXT PRIMARY KEY,
             user_id INT REFERENCES users(id) ON DELETE CASCADE,
             expires_at TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS tailored_cv_results (
+            id SERIAL PRIMARY KEY,
+            profile_id INT REFERENCES profiles(id) ON DELETE CASCADE,
+            job_description TEXT,
+            result TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
         );
     """)
     conn.commit()
@@ -397,6 +406,20 @@ def save_interview_prep(profile_id: int, result_dict) -> None:
 
 def save_cv_download(profile_id: int, result_dict) -> None:
     _insert(RESULT_TABLES["cv_download"], profile_id, "result", json.dumps(result_dict))
+
+
+@_log_db_write
+def save_tailored_cv(profile_id: int, job_description: str, result: str) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO tailored_cv_results (profile_id, job_description, result)
+           VALUES (%s, %s, %s);""",
+        (profile_id, job_description, result),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
 def save_career_roadmap(profile_id: int, result_dict) -> None:

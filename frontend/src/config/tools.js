@@ -1,6 +1,7 @@
 import {
   BarChart2,
   FileText,
+  FileEdit,
   Mail,
   Briefcase,
   Mic,
@@ -40,6 +41,15 @@ export const TOOLS = [
     name: 'CV Translator',
     description: 'Translate your CV into another language.',
     text: 'text-rose-600',
+    category: 'CV Tools',
+  },
+  {
+    to: '/tailored-cv-builder',
+    doneKey: 'tailored_cv',
+    icon: FileEdit,
+    name: 'Tailored CV Builder',
+    description: 'Rewrite your CV for one specific job.',
+    text: 'text-amber-600',
     category: 'CV Tools',
   },
   {
