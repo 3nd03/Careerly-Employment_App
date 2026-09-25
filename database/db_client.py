@@ -45,6 +45,8 @@ _TABLE_BY_FUNC = {
     "create_remember_token": "remember_tokens",
     "delete_remember_token": "remember_tokens",
     "save_tailored_cv": "tailored_cv_results",
+    "create_password_reset_token": "password_reset_tokens",
+    "delete_reset_token": "password_reset_tokens",
 }
 
 
@@ -189,6 +191,11 @@ def init_db():
             job_description TEXT,
             result TEXT,
             created_at TIMESTAMP DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            token TEXT PRIMARY KEY,
+            user_id INT REFERENCES users(id) ON DELETE CASCADE,
+            expires_at TIMESTAMP
         );
     """)
     conn.commit()
@@ -579,6 +586,47 @@ def delete_remember_token(token: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("DELETE FROM remember_tokens WHERE token = %s;", (token,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+@_log_db_write
+def create_password_reset_token(user_id: int, hours: int = 1) -> str:
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=hours)
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (%s, %s, %s);",
+        (token, user_id, expires_at),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return token
+
+
+def get_user_by_reset_token(token: str) -> dict | None:
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        """SELECT u.* FROM users u
+           JOIN password_reset_tokens t ON t.user_id = u.id
+           WHERE t.token = %s AND t.expires_at > NOW();""",
+        (token,),
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return dict(row) if row else None
+
+
+@_log_db_write
+def delete_reset_token(token: str) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM password_reset_tokens WHERE token = %s;", (token,))
     conn.commit()
     cur.close()
     conn.close()
