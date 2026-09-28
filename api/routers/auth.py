@@ -57,22 +57,20 @@ def get_me(user: dict = Depends(get_current_user)):
     return user
 
 
+RESET_TOKEN_NOTE = (
+    "If that email is registered, a reset token has been generated. "
+    "Email sending is not yet configured. Use this token to reset your password."
+)
+
+
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(payload: ForgotPasswordRequest):
     email = payload.email.strip().lower()
     user = get_user_by_email(email)
     if not user:
-        return ForgotPasswordResponse(
-            detail="If that email is registered, a reset link has been sent."
-        )
+        return ForgotPasswordResponse(detail=RESET_TOKEN_NOTE)
     token = create_password_reset_token(user["id"])
-    return ForgotPasswordResponse(
-        detail=(
-            "If that email is registered, a reset link has been sent. "
-            "Email sending not yet configured, use this token directly."
-        ),
-        reset_token=token,
-    )
+    return ForgotPasswordResponse(detail=RESET_TOKEN_NOTE, reset_token=token)
 
 
 @router.post("/reset-password")

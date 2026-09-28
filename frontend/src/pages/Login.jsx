@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../api/auth'
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const successMessage = location.state?.message || ''
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -34,6 +36,7 @@ export default function Login() {
         <h2 className="text-xl font-bold text-teal">Get your next role faster</h2>
         <p className="text-body text-sm mt-1 mb-6">Log in to pick up where you left off.</p>
 
+        {successMessage && <p className="text-sm text-teal mb-4">{successMessage}</p>}
         {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">

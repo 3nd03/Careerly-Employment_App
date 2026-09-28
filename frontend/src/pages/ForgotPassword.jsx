@@ -18,7 +18,7 @@ export default function ForgotPassword() {
     try {
       const { reset_token } = await forgotPassword(email.trim().toLowerCase())
       setMessage(
-        'If that email is registered, a reset link has been sent. For now, use the token returned by the API directly.'
+        'If that email is registered, a reset token has been generated. For now, copy it from the API response and use it below.'
       )
       if (reset_token) {
         setResetToken(reset_token)
@@ -75,7 +75,7 @@ export default function ForgotPassword() {
               disabled={loading}
               className="w-full bg-mint text-teal rounded-lg py-2.5 font-medium disabled:opacity-50"
             >
-              {loading ? 'Sending...' : 'Send reset link'}
+              {loading ? 'Requesting...' : 'Request reset token'}
             </button>
           </form>
         )}
