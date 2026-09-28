@@ -22,6 +22,7 @@ from database.db_client import (
 from services.claude_client import call_claude
 from services.s3_client import upload_avatar, upload_cv
 from utils.pdf import extract_pdf_text
+from utils.file_validation import validate_pdf
 from prompts.profile_extraction_prompt import build_profile_extraction_prompt
 from api.schemas import (
     ProfileCreate,
@@ -62,6 +63,7 @@ def _parse_extracted(raw: str) -> dict:
 @router.post("/cv-prefill", response_model=CVPrefillResponse)
 async def cv_prefill(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
     file_bytes = await file.read()
+    validate_pdf(file_bytes, file.filename)
     try:
         cv_text = extract_pdf_text(io.BytesIO(file_bytes)).strip()
     except Exception:
@@ -140,6 +142,7 @@ def get_profile_history_for_tool(tool_key: str, profile: dict = Depends(get_curr
 @router.post("/cv", response_model=CVUploadResponse)
 async def upload_profile_cv(file: UploadFile = File(...), profile: dict = Depends(get_current_profile)):
     file_bytes = await file.read()
+    validate_pdf(file_bytes, file.filename)
     cv_text = extract_pdf_text(io.BytesIO(file_bytes)).strip()
     s3_key = upload_cv(file_bytes, profile["id"], file.filename)
     update_profile_cv(profile["id"], s3_key, cv_text)

@@ -24,6 +24,7 @@ from database.db_client import (
 )
 from utils.pdf import extract_pdf_text, generate_pdf
 from utils.ats_check import check_ats_compatibility
+from utils.file_validation import validate_pdf
 
 from prompts.skill_gap_prompt import build_skill_gap_prompt
 from prompts.cv_prompt import build_cv_prompt
@@ -83,6 +84,7 @@ def run_skill_gap(profile: dict = Depends(get_current_profile)):
 @router.post("/cv-analyse")
 async def run_cv_analyse(file: UploadFile = File(...), profile: dict = Depends(get_current_profile)):
     file_bytes = await file.read()
+    validate_pdf(file_bytes, file.filename)
     cv_text = extract_pdf_text(io.BytesIO(file_bytes)).strip()
     prompt = build_cv_prompt(profile["data"], cv_text)
     result = call_claude(prompt)
@@ -186,6 +188,7 @@ async def run_tailored_cv(
     resolved_cv_text = cv_text
     if cv_file is not None:
         file_bytes = await cv_file.read()
+        validate_pdf(file_bytes, cv_file.filename)
         resolved_cv_text = extract_pdf_text(io.BytesIO(file_bytes)).strip()
     prompt = build_tailored_cv_prompt(profile["data"], job_description, resolved_cv_text)
     result = call_claude(prompt)
