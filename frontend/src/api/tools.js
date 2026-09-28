@@ -34,10 +34,15 @@ export async function runInterviewPrep() {
   return data
 }
 
-export async function runTailoredCv(jobDescription, cvText) {
-  const { data } = await client.post('/tools/tailored-cv', {
-    job_description: jobDescription,
-    cv_text: cvText,
+export async function runTailoredCv(jobDescription, cvText, cvFile) {
+  const formData = new FormData()
+  formData.append('job_description', jobDescription)
+  formData.append('cv_text', cvText || '')
+  if (cvFile) {
+    formData.append('cv_file', cvFile)
+  }
+  const { data } = await client.post('/tools/tailored-cv', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   })
   return data
 }

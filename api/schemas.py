@@ -125,13 +125,9 @@ class CVDownloadRequest(BaseModel):
     cv_text: str
 
 
-class TailoredCvRequest(BaseModel):
-    job_description: str
-    cv_text: str = ""
-
-
 class TailoredCvResponse(BaseModel):
     result: str
+    ats_compatible: bool
 
 
 class CVTranslateRequest(BaseModel):

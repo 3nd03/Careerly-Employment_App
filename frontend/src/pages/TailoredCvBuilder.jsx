@@ -9,7 +9,9 @@ import { markToolUsed } from '../utils/toolActivity'
 export default function TailoredCvBuilder() {
   const [jobDescription, setJobDescription] = useState('')
   const [cvText, setCvText] = useState('')
+  const [cvFile, setCvFile] = useState(null)
   const [result, setResult] = useState('')
+  const [atsCompatible, setAtsCompatible] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -21,8 +23,9 @@ export default function TailoredCvBuilder() {
     setLoading(true)
     setError('')
     try {
-      const { result: cv } = await runTailoredCv(jobDescription.trim(), cvText.trim())
+      const { result: cv, ats_compatible } = await runTailoredCv(jobDescription.trim(), cvText.trim(), cvFile)
       setResult(cv)
+      setAtsCompatible(ats_compatible)
       markToolUsed('tailored_cv')
     } catch {
       setError('Could not generate the CV. Try again.')
@@ -66,15 +69,29 @@ export default function TailoredCvBuilder() {
         />
 
         <label className="text-[11px] uppercase tracking-wide text-label mt-4 block">
-          Existing CV text (optional)
+          Upload your current CV (optional)
         </label>
-        <p className="text-xs text-gray-500 mt-1 mb-1">Leave blank to use your profile only.</p>
+        <label className="mt-1 block border-2 border-dashed border-card-border bg-gray-50 rounded-xl p-4 text-center cursor-pointer">
+          <span className="text-body text-sm">{cvFile ? cvFile.name : 'Upload a PDF, or paste your CV text below instead'}</span>
+          <input
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(e) => setCvFile(e.target.files?.[0] || null)}
+          />
+        </label>
+
+        <label className="text-[11px] uppercase tracking-wide text-label mt-4 block">
+          Paste your current CV here (optional — leave blank to use your profile only)
+        </label>
         <textarea
           rows={8}
           value={cvText}
           onChange={(e) => setCvText(e.target.value)}
-          className="w-full bg-white border border-card-border rounded-[10px] px-4 py-3 text-sm text-body focus:outline-none focus:border-mint transition-colors duration-200"
+          disabled={!!cvFile}
+          className="w-full bg-white border border-card-border rounded-[10px] px-4 py-3 text-sm text-body focus:outline-none focus:border-mint transition-colors duration-200 disabled:opacity-50"
         />
+        {cvFile && <p className="text-xs text-gray-500 mt-1">Using the uploaded PDF instead of pasted text.</p>}
 
         <button
           type="button"
@@ -91,8 +108,19 @@ export default function TailoredCvBuilder() {
       {result && (
         <>
           <Card className="mt-6 print:hidden">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-teal text-sm">Your Tailored CV</h2>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <h2 className="font-bold text-teal text-sm">Your Tailored CV</h2>
+                {atsCompatible ? (
+                  <span className="bg-green-100 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                    ATS Compatible
+                  </span>
+                ) : (
+                  <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                    Review recommended
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={handleDownload}

@@ -23,6 +23,7 @@ const HISTORY_LABELS = {
   cv_download: 'CV Download',
   career_roadmap: 'Career Roadmap',
   salary_insights: 'Salary Insights',
+  tailored_cv: 'Tailored CV Builder',
 }
 
 const HISTORY_PREVIEW_LIMIT = 5

@@ -1,6 +1,6 @@
 import io
 
-from fastapi import APIRouter, Depends, File, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 
 from services.claude_client import call_claude
 from services.s3_client import upload_cv
@@ -23,6 +23,7 @@ from database.db_client import (
     get_latest,
 )
 from utils.pdf import extract_pdf_text, generate_pdf
+from utils.ats_check import check_ats_compatibility
 
 from prompts.skill_gap_prompt import build_skill_gap_prompt
 from prompts.cv_prompt import build_cv_prompt
@@ -47,7 +48,6 @@ from api.schemas import (
     ApplicationStatusUpdate,
     FollowupRequest,
     FollowupResponse,
-    TailoredCvRequest,
     TailoredCvResponse,
 )
 
@@ -177,11 +177,21 @@ def run_cv_translate(payload: CVTranslateRequest, profile: dict = Depends(get_cu
 
 
 @router.post("/tailored-cv", response_model=TailoredCvResponse)
-def run_tailored_cv(payload: TailoredCvRequest, profile: dict = Depends(get_current_profile)):
-    prompt = build_tailored_cv_prompt(profile["data"], payload.job_description, payload.cv_text)
+async def run_tailored_cv(
+    job_description: str = Form(...),
+    cv_text: str = Form(""),
+    cv_file: UploadFile | None = File(None),
+    profile: dict = Depends(get_current_profile),
+):
+    resolved_cv_text = cv_text
+    if cv_file is not None:
+        file_bytes = await cv_file.read()
+        resolved_cv_text = extract_pdf_text(io.BytesIO(file_bytes)).strip()
+    prompt = build_tailored_cv_prompt(profile["data"], job_description, resolved_cv_text)
     result = call_claude(prompt)
-    save_tailored_cv(profile["id"], payload.job_description, result)
-    return TailoredCvResponse(result=result)
+    ats_compatible = check_ats_compatibility(result)
+    save_tailored_cv(profile["id"], job_description, result)
+    return TailoredCvResponse(result=result, ats_compatible=ats_compatible)
 
 
 @router.get("/applications", response_model=list[ApplicationOut])
