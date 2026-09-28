@@ -11,6 +11,7 @@ from database.db_client import (
     set_active_profile,
     update_profile,
     update_profile_label,
+    update_profile_cv,
     update_user,
     get_history,
     get_latest,
@@ -19,7 +20,7 @@ from database.db_client import (
     RESULT_TABLES,
 )
 from services.claude_client import call_claude
-from services.s3_client import upload_avatar
+from services.s3_client import upload_avatar, upload_cv
 from utils.pdf import extract_pdf_text
 from prompts.profile_extraction_prompt import build_profile_extraction_prompt
 from api.schemas import (
@@ -30,6 +31,7 @@ from api.schemas import (
     CVPrefillResponse,
     HistoryEntry,
     AvatarUploadResponse,
+    CVUploadResponse,
     ToolsUsedResponse,
     LatestSkillGapResponse,
 )
@@ -133,6 +135,15 @@ def get_profile_history_for_tool(tool_key: str, profile: dict = Depends(get_curr
     if tool_key not in RESULT_TABLES:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown tool")
     return _format_history_entries(get_history(tool_key, profile["id"]))
+
+
+@router.post("/cv", response_model=CVUploadResponse)
+async def upload_profile_cv(file: UploadFile = File(...), profile: dict = Depends(get_current_profile)):
+    file_bytes = await file.read()
+    cv_text = extract_pdf_text(io.BytesIO(file_bytes)).strip()
+    s3_key = upload_cv(file_bytes, profile["id"], file.filename)
+    update_profile_cv(profile["id"], s3_key, cv_text)
+    return CVUploadResponse(cv_text=cv_text, cv_s3_key=s3_key)
 
 
 @router.post("/avatar", response_model=AvatarUploadResponse)

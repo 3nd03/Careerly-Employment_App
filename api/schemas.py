@@ -103,6 +103,11 @@ class AvatarUploadResponse(BaseModel):
     avatar_s3_key: str
 
 
+class CVUploadResponse(BaseModel):
+    cv_text: str
+    cv_s3_key: str
+
+
 class ToolsUsedResponse(BaseModel):
     count: int
     total: int

@@ -39,6 +39,15 @@ export async function cvPrefill(file) {
   return data
 }
 
+export async function uploadProfileCv(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const { data } = await client.post('/profile/cv', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
 export async function getProfileHistory() {
   const { data } = await client.get('/profile/history')
   return data

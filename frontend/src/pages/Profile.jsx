@@ -11,6 +11,7 @@ import {
   renameProfile,
   getProfileHistory,
   uploadAvatar,
+  uploadProfileCv,
 } from '../api/profile'
 
 const HISTORY_LABELS = {
@@ -94,9 +95,15 @@ export default function Profile() {
   const navigate = useNavigate()
   const location = useLocation()
   const fileInputRef = useRef(null)
+  const cvInputRef = useRef(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState('')
+
+  const [cvS3Key, setCvS3Key] = useState(null)
+  const [cvUploading, setCvUploading] = useState(false)
+  const [cvError, setCvError] = useState('')
+  const [cvPreview, setCvPreview] = useState('')
 
   const email = localStorage.getItem('email') || ''
   const displayName = localStorage.getItem('display_name') || email.split('@')[0] || 'Account'
@@ -119,6 +126,7 @@ export default function Profile() {
     getProfile()
       .then((data) => {
         setFields(data.data)
+        setCvS3Key(data.cv_s3_key || null)
       })
       .catch((err) => {
         if (err.response?.status === 404) navigate('/onboarding')
@@ -200,6 +208,28 @@ export default function Profile() {
     }
   }
 
+  async function handleCvPick(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCvError('')
+    setCvPreview('')
+    setCvUploading(true)
+    try {
+      const { cv_text, cv_s3_key } = await uploadProfileCv(file)
+      if (!cv_text.trim()) {
+        setCvError('Could not extract any text from that PDF. Try a different file.')
+      } else {
+        setCvS3Key(cv_s3_key)
+        setCvPreview(cv_text.slice(0, 100))
+      }
+    } catch {
+      setCvError('Could not upload the CV. Try again.')
+    } finally {
+      setCvUploading(false)
+      e.target.value = ''
+    }
+  }
+
   async function handleSaveProfile(e) {
     e.preventDefault()
     setSavingProfile(true)
@@ -260,6 +290,32 @@ export default function Profile() {
           </div>
           <div className="mt-4">
             <PlaceholderNote message="Saving name and password needs a backend endpoint that isn't available yet." />
+          </div>
+
+          <div className="mt-6 bg-white border-l-[3px] border-mint rounded-r-lg p-4">
+            <h3 className="font-bold text-teal mb-1 text-sm">CV</h3>
+            <p className="text-body text-sm">
+              {cvS3Key ? `Current CV: ${cvS3Key.split('/').pop()}` : 'No CV uploaded yet.'}
+            </p>
+            <input
+              ref={cvInputRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={handleCvPick}
+            />
+            <button
+              type="button"
+              onClick={() => cvInputRef.current?.click()}
+              disabled={cvUploading}
+              className="mt-3 border border-card-border text-teal bg-white rounded-[10px] px-4 py-2 text-sm disabled:opacity-50 transition-colors duration-200"
+            >
+              {cvUploading ? 'Uploading...' : cvS3Key ? 'Replace CV' : 'Upload CV'}
+            </button>
+            {cvPreview && (
+              <p className="text-sm text-teal mt-2">CV updated. Extracted text starts with: "{cvPreview}..."</p>
+            )}
+            {cvError && <p className="text-sm text-red-600 mt-2">{cvError}</p>}
           </div>
         </section>
 

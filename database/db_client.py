@@ -36,6 +36,7 @@ _TABLE_BY_FUNC = {
     "update_profile_label": "profiles",
     "set_profile_cv": "profiles",
     "update_profile": "profiles",
+    "update_profile_cv": "profiles",
     "save_cv_upload": "cv_uploads",
     "save_cover_letter": "cover_letters",
     "save_linkedin_message": "linkedin_messages",
@@ -102,6 +103,8 @@ def init_db():
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT NOW()
         );
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cv_s3_key TEXT;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cv_text TEXT;
         CREATE TABLE IF NOT EXISTS cv_uploads (
             id SERIAL PRIMARY KEY,
             profile_id INT REFERENCES profiles(id) ON DELETE CASCADE,
@@ -334,6 +337,19 @@ def set_profile_cv(profile_id: int, cv_s3_key: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("UPDATE profiles SET cv_s3_key = %s WHERE id = %s;", (cv_s3_key, profile_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+@_log_db_write
+def update_profile_cv(profile_id: int, cv_s3_key: str, cv_text: str) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE profiles SET cv_s3_key = %s, cv_text = %s WHERE id = %s;",
+        (cv_s3_key, cv_text, profile_id),
+    )
     conn.commit()
     cur.close()
     conn.close()
