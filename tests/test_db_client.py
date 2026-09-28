@@ -108,6 +108,33 @@ def test_save_cv_upload_stores_s3_key(mock_get_conn):
 
 
 @patch("database.db_client.get_connection")
+def test_update_profile_cv_stores_s3_key_and_text(mock_get_conn):
+    from database.db_client import update_profile_cv
+    mock_conn, mock_cur = make_mock_conn()
+    mock_get_conn.return_value = mock_conn
+
+    update_profile_cv(7, "cvs/7/resume.pdf", "Extracted CV text")
+
+    sql, params = mock_cur.execute.call_args.args
+    assert "profiles" in sql
+    assert "cvs/7/resume.pdf" in params
+    assert "Extracted CV text" in params
+
+
+@patch("database.db_client.get_connection")
+def test_delete_application_removes_by_id(mock_get_conn):
+    from database.db_client import delete_application
+    mock_conn, mock_cur = make_mock_conn()
+    mock_get_conn.return_value = mock_conn
+
+    delete_application(3)
+
+    sql, params = mock_cur.execute.call_args.args
+    assert "applications" in sql
+    assert 3 in params
+
+
+@patch("database.db_client.get_connection")
 def test_db_connection_closed_after_operation(mock_get_conn):
     from database.db_client import save_cv_upload
     mock_conn, mock_cur = make_mock_conn()

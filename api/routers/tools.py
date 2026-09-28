@@ -19,6 +19,7 @@ from database.db_client import (
     save_application,
     get_applications,
     update_application_status,
+    delete_application,
     save_tailored_cv,
     get_latest,
 )
@@ -37,11 +38,15 @@ from prompts.career_roadmap_prompt import build_career_roadmap_prompt
 from prompts.salary_insights_prompt import build_salary_insights_prompt
 from prompts.cv_translator_prompt import build_cv_translator_prompt
 from prompts.tailored_cv_prompt import build_tailored_cv_prompt
+from prompts.interview_feedback_prompt import build_interview_feedback_prompt
 
 from api.dependencies import get_current_profile
 from api.schemas import (
+    SkillGapRequest,
     CoverLetterRequest,
     LinkedInRequest,
+    InterviewFeedbackRequest,
+    InterviewFeedbackResponse,
     CVDownloadRequest,
     CVTranslateRequest,
     ApplicationCreate,
@@ -73,8 +78,8 @@ def _parse_labeled(text: str, labels: list[str]) -> dict:
 
 
 @router.post("/skill-gap")
-def run_skill_gap(profile: dict = Depends(get_current_profile)):
-    prompt = build_skill_gap_prompt(profile["data"])
+def run_skill_gap(payload: SkillGapRequest = SkillGapRequest(), profile: dict = Depends(get_current_profile)):
+    prompt = build_skill_gap_prompt(profile["data"], payload.job_description)
     response = call_claude(prompt)
     result = _parse_labeled(response, ["MATCH_SCORE", "STRONG_SKILLS", "MISSING_SKILLS", "NEXT_STEPS"])
     save_skill_gap(profile["id"], result)
@@ -96,7 +101,7 @@ async def run_cv_analyse(file: UploadFile = File(...), profile: dict = Depends(g
 
 @router.post("/cover-letter")
 def run_cover_letter(payload: CoverLetterRequest, profile: dict = Depends(get_current_profile)):
-    prompt = build_cover_letter_prompt(profile["data"], payload.job_description)
+    prompt = build_cover_letter_prompt(profile["data"], payload.job_description, payload.tone)
     letter_text = call_claude(prompt)
     save_cover_letter(profile["id"], payload.job_description, letter_text)
     return {"letter_text": letter_text}
@@ -130,6 +135,13 @@ def run_interview_prep(profile: dict = Depends(get_current_profile)):
     result = call_claude(prompt)
     save_interview_prep(profile["id"], result)
     return {"result": result}
+
+
+@router.post("/interview-feedback", response_model=InterviewFeedbackResponse)
+def run_interview_feedback(payload: InterviewFeedbackRequest, profile: dict = Depends(get_current_profile)):
+    prompt = build_interview_feedback_prompt(payload.question, payload.answer)
+    feedback = call_claude(prompt)
+    return InterviewFeedbackResponse(feedback=feedback)
 
 
 @router.post("/cv-download")
@@ -213,6 +225,12 @@ def add_application(payload: ApplicationCreate, profile: dict = Depends(get_curr
 def update_application(application_id: int, payload: ApplicationStatusUpdate):
     update_application_status(application_id, payload.status)
     return {"detail": "Status updated"}
+
+
+@router.delete("/applications/{application_id}")
+def remove_application(application_id: int):
+    delete_application(application_id)
+    return {"detail": "Application deleted"}
 
 
 @router.post("/followup", response_model=FollowupResponse)

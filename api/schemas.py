@@ -118,8 +118,13 @@ class LatestSkillGapResponse(BaseModel):
     created_at: datetime | None = None
 
 
+class SkillGapRequest(BaseModel):
+    job_description: str = ""
+
+
 class CoverLetterRequest(BaseModel):
     job_description: str
+    tone: str = "Formal"
 
 
 class LinkedInRequest(BaseModel):
@@ -159,6 +164,15 @@ class ApplicationOut(BaseModel):
 
 class ApplicationStatusUpdate(BaseModel):
     status: str
+
+
+class InterviewFeedbackRequest(BaseModel):
+    question: str
+    answer: str
+
+
+class InterviewFeedbackResponse(BaseModel):
+    feedback: str
 
 
 class FollowupRequest(BaseModel):

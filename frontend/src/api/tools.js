@@ -1,7 +1,7 @@
 import client from './client'
 
-export async function runSkillGap() {
-  const { data } = await client.post('/tools/skill-gap')
+export async function runSkillGap(jobDescription = '') {
+  const { data } = await client.post('/tools/skill-gap', { job_description: jobDescription })
   return data
 }
 
@@ -14,8 +14,8 @@ export async function runCvAnalyse(file) {
   return data
 }
 
-export async function runCoverLetter(jobDescription) {
-  const { data } = await client.post('/tools/cover-letter', { job_description: jobDescription })
+export async function runCoverLetter(jobDescription, tone = 'Formal') {
+  const { data } = await client.post('/tools/cover-letter', { job_description: jobDescription, tone })
   return data
 }
 
@@ -31,6 +31,11 @@ export async function runLinkedInMessage(context) {
 
 export async function runInterviewPrep() {
   const { data } = await client.post('/tools/interview-prep')
+  return data
+}
+
+export async function runInterviewFeedback(question, answer) {
+  const { data } = await client.post('/tools/interview-feedback', { question, answer })
   return data
 }
 
@@ -87,6 +92,11 @@ export async function addApplication({ company, role, date_applied, status }) {
 
 export async function updateApplicationStatus(applicationId, status) {
   const { data } = await client.put(`/tools/applications/${applicationId}`, { status })
+  return data
+}
+
+export async function deleteApplication(applicationId) {
+  const { data } = await client.delete(`/tools/applications/${applicationId}`)
   return data
 }
 

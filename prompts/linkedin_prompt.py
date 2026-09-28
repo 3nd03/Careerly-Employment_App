@@ -11,7 +11,7 @@ CANDIDATE PROFILE:
 {target_context}
 Instructions:
 - Write a complete message ready to send. No section labels, no placeholders, no commentary.
-- Maximum 3 short paragraphs, under 150 words total. LinkedIn connection notes get read on a phone.
+- Maximum 300 characters total, including spaces. This is LinkedIn's hard limit for a connection request note, so staying under it is mandatory, not a suggestion.
 - Open with a specific, genuine reason for reaching out. No generic flattery.
 - Reference the candidate's actual background or skills only where it strengthens the ask.
 - End with one clear, low-friction ask, such as a short call or a question.

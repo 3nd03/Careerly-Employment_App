@@ -17,6 +17,7 @@ function ResultCard({ title, children }) {
 }
 
 export default function SkillGap() {
+  const [jobDescription, setJobDescription] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -25,7 +26,7 @@ export default function SkillGap() {
     setLoading(true)
     setError('')
     try {
-      const data = await runSkillGap()
+      const data = await runSkillGap(jobDescription.trim())
       setResult(data)
       markToolUsed('skill_gap')
     } catch {
@@ -40,6 +41,16 @@ export default function SkillGap() {
       <BackButton />
       <Card>
         <h1 className="text-2xl font-bold text-teal mb-6">Skill Gap Analysis</h1>
+
+        <label className="text-[11px] uppercase tracking-wide text-label">
+          Job description (optional — leave blank to match against your target role)
+        </label>
+        <textarea
+          rows={6}
+          value={jobDescription}
+          onChange={(e) => setJobDescription(e.target.value)}
+          className="mt-1 mb-4 w-full bg-white border border-card-border rounded-[10px] px-4 py-3 text-sm text-body focus:outline-none focus:border-mint transition-colors duration-200"
+        />
 
         <button
           type="button"

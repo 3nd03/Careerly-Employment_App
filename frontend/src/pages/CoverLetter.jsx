@@ -6,8 +6,11 @@ import FollowUpChat from '../components/FollowUpChat'
 import { runCoverLetter } from '../api/tools'
 import { markToolUsed } from '../utils/toolActivity'
 
+const TONES = ['Formal', 'Warm', 'Direct']
+
 export default function CoverLetter() {
   const [jobDescription, setJobDescription] = useState('')
+  const [tone, setTone] = useState('Formal')
   const [result, setResult] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -21,7 +24,7 @@ export default function CoverLetter() {
     setLoading(true)
     setError('')
     try {
-      const { letter_text } = await runCoverLetter(jobDescription.trim())
+      const { letter_text } = await runCoverLetter(jobDescription.trim(), tone)
       setResult(letter_text)
       markToolUsed('cover_letter')
     } catch {
@@ -50,6 +53,22 @@ export default function CoverLetter() {
           onChange={(e) => setJobDescription(e.target.value)}
           className="mt-1 w-full bg-white border border-card-border rounded-[10px] px-4 py-3 text-sm text-body focus:outline-none focus:border-mint transition-colors duration-200"
         />
+
+        <label className="text-[11px] uppercase tracking-wide text-label mt-4 block">Tone</label>
+        <div className="mt-1 flex gap-2">
+          {TONES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTone(t)}
+              className={`px-4 py-2 rounded-[10px] text-sm font-medium transition-colors duration-200 ${
+                tone === t ? 'bg-mint text-teal' : 'bg-white border border-card-border text-gray-500 hover:bg-mint-light'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
 
         <button
           type="button"

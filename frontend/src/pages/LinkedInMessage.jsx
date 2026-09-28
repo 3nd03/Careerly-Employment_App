@@ -67,6 +67,9 @@ export default function LinkedInMessage() {
               </button>
               <h3 className="font-bold text-teal mb-1 text-sm">Your Message</h3>
               <p className="text-body text-sm whitespace-pre-line pr-16">{result}</p>
+              <p className={`text-xs mt-2 ${result.length > 300 ? 'text-red-600' : 'text-gray-500'}`}>
+                {result.length} / 300 characters
+              </p>
             </div>
             <FollowUpChat toolName="linkedin_message" result={result} />
           </>

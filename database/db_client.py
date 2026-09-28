@@ -43,6 +43,7 @@ _TABLE_BY_FUNC = {
     "save_cv_translation": "cv_translations",
     "save_application": "applications",
     "update_application_status": "applications",
+    "delete_application": "applications",
     "create_remember_token": "remember_tokens",
     "delete_remember_token": "remember_tokens",
     "save_tailored_cv": "tailored_cv_results",
@@ -499,6 +500,16 @@ def update_application_status(application_id: int, status: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("UPDATE applications SET status = %s WHERE id = %s;", (status, application_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+@_log_db_write
+def delete_application(application_id: int) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM applications WHERE id = %s;", (application_id,))
     conn.commit()
     cur.close()
     conn.close()
