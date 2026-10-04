@@ -13,4 +13,4 @@ uvicorn
 python-multipart
 pytest
 email-validator
-httpx2
+httpx
