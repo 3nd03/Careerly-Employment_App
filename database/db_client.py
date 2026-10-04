@@ -25,6 +25,7 @@ RESULT_TABLES = {
     "career_roadmap": "career_roadmap_results",
     "salary_insights": "salary_insights_results",
     "tailored_cv": "tailored_cv_results",
+    "cv_translate": "cv_translations",
 }
 
 _TABLE_BY_FUNC = {
@@ -623,6 +624,24 @@ def delete_remember_token(token: str) -> None:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("DELETE FROM remember_tokens WHERE token = %s;", (token,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def delete_all_remember_tokens(user_id: int) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM remember_tokens WHERE user_id = %s;", (user_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def delete_other_remember_tokens(user_id: int, keep_token: str) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM remember_tokens WHERE user_id = %s AND token <> %s;", (user_id, keep_token))
     conn.commit()
     cur.close()
     conn.close()

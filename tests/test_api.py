@@ -24,6 +24,7 @@ class FakeDB:
         self.applications = {}
         self.cover_letters = []
         self.claude_prompts = []
+        self.sent_emails = []
 
     # users and tokens
     def create_user(self, email, password_hash, display_name):
@@ -51,6 +52,16 @@ class FakeDB:
 
     def delete_remember_token(self, token):
         self.tokens.pop(token, None)
+
+    def delete_all_remember_tokens(self, user_id):
+        self.tokens = {t: uid for t, uid in self.tokens.items() if uid != user_id}
+
+    def send_password_reset_email(self, to, token):
+        self.sent_emails.append((to, token))
+        return True
+
+    def delete_other_remember_tokens(self, user_id, keep_token):
+        self.tokens = {t: uid for t, uid in self.tokens.items() if uid != user_id or t == keep_token}
 
     def create_password_reset_token(self, user_id):
         token = secrets.token_hex(8)
@@ -115,6 +126,7 @@ def db(monkeypatch):
         "api.dependencies": ["get_user_by_remember_token", "get_active_profile"],
         "api.routers.auth": [
             "create_user", "get_user_by_email", "create_remember_token", "delete_remember_token",
+            "delete_other_remember_tokens", "delete_all_remember_tokens", "send_password_reset_email",
             "create_password_reset_token", "get_user_by_reset_token", "delete_reset_token", "update_user",
         ],
         "api.routers.tools": [
@@ -130,6 +142,7 @@ def db(monkeypatch):
     monkeypatch.setattr("api.routers.profile.upload_cv", lambda *args, **kwargs: "cvs/test.pdf")
     monkeypatch.setattr("api.routers.profile.update_profile_cv", lambda *args, **kwargs: None)
     monkeypatch.setattr("api.routers.profile.extract_pdf_text", lambda *args, **kwargs: "CV text")
+    monkeypatch.setattr("api.routers.profile.get_history", lambda tool_key, profile_id: [])
     return fake
 
 
@@ -195,9 +208,31 @@ def test_M3_T05_password_stored_hashed(client, db):
     assert "password123" not in stored
 
 
-def test_M3_T07_password_reset(client, db):
+def test_M3_T07_forgot_password_emails_link_not_token_in_response(client, db):
     signup(client)
-    token = client.post("/auth/forgot-password", json={"email": "user@example.com"}).json()["reset_token"]
+    response = client.post("/auth/forgot-password", json={"email": " User@Example.com "})
+
+    assert response.status_code == 200
+    assert response.json() == {"detail": "If that email is registered, password reset instructions have been sent."}
+    assert len(db.sent_emails) == 1
+    to, token = db.sent_emails[0]
+    assert to == "user@example.com"
+    assert token in db.reset_tokens
+
+
+def test_M3_T07_unknown_email_looks_the_same(client, db):
+    signup(client)
+    known = client.post("/auth/forgot-password", json={"email": "user@example.com"})
+    unknown = client.post("/auth/forgot-password", json={"email": "nobody@example.com"})
+    assert known.status_code == unknown.status_code == 200
+    assert known.json() == unknown.json()
+    assert [to for to, _ in db.sent_emails] == ["user@example.com"]
+
+
+def test_M3_T07_password_reset_with_emailed_token(client, db):
+    headers = signup(client)
+    client.post("/auth/forgot-password", json={"email": "user@example.com"})
+    token = db.sent_emails[0][1]
 
     response = client.post("/auth/reset-password", json={"token": token, "new_password": "newpassword456"})
     assert response.status_code == 200
@@ -206,6 +241,60 @@ def test_M3_T07_password_reset(client, db):
     new = client.post("/auth/login", json={"email": "user@example.com", "password": "newpassword456"})
     assert old.status_code == 401
     assert new.status_code == 200
+    assert client.get("/auth/me", headers=headers).status_code == 401  # existing sessions signed out
+    reused = client.post("/auth/reset-password", json={"token": token, "new_password": "another789xyz"})
+    assert reused.status_code == 400  # single use
+
+
+def test_M3_T07_invalid_reset_token(client, db):
+    response = client.post("/auth/reset-password", json={"token": "not-a-token", "new_password": "newpassword456"})
+    assert response.status_code == 400
+
+def test_profile_update_display_name(client, db):
+    headers = signup(client)
+    response = client.put("/auth/me", json={"display_name": "  New Name  "}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["display_name"] == "New Name"
+    assert "password_hash" not in response.json()
+    assert client.get("/auth/me", headers=headers).json()["display_name"] == "New Name"
+
+
+def test_profile_update_display_name_rejects_blank(client, db):
+    headers = signup(client)
+    assert client.put("/auth/me", json={"display_name": "   "}, headers=headers).status_code == 422
+
+
+def test_change_password(client, db):
+    headers = signup(client, password="password123")
+    other_session = client.post("/auth/login", json={"email": "user@example.com", "password": "password123"}).json()
+
+    response = client.post(
+        "/auth/change-password",
+        json={"current_password": "password123", "new_password": "newpassword456"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert client.post("/auth/login", json={"email": "user@example.com", "password": "newpassword456"}).status_code == 200
+    assert client.get("/auth/me", headers=headers).status_code == 200
+    other_headers = {"Authorization": f"Bearer {other_session['access_token']}"}
+    assert client.get("/auth/me", headers=other_headers).status_code == 401
+
+
+def test_change_password_wrong_current_password(client, db):
+    headers = signup(client, password="password123")
+    response = client.post(
+        "/auth/change-password",
+        json={"current_password": "wrong-password", "new_password": "newpassword456"},
+        headers=headers,
+    )
+    assert response.status_code == 400
+    assert client.post("/auth/login", json={"email": "user@example.com", "password": "password123"}).status_code == 200
+
+
+def test_change_password_requires_login(client, db):
+    response = client.post("/auth/change-password", json={"current_password": "a", "new_password": "newpassword456"})
+    assert response.status_code in (401, 403)
 
 
 def test_N_T03_duplicate_account_rejected(client, db):
@@ -312,6 +401,17 @@ def test_M2_T09_replace_cv_with_valid_pdf(client, db):
     assert response.json()["cv_s3_key"] == "cvs/test.pdf"
 
 
+# Profile history
+
+def test_profile_history_includes_cv_translate_key(client, db):
+    # Regression: cv_translate was missing from RESULT_TABLES, so it never appeared here
+    # even though the CV Translator saved results to the database.
+    headers = signup(client)
+    response = client.get("/profile/history", headers=headers)
+    assert response.status_code == 200
+    assert "cv_translate" in response.json()
+
+
 # N-T05 / N-T06 – generation needs a profile and a job description
 
 def test_N_T05_generation_without_profile_rejected(client, db):
@@ -345,6 +445,18 @@ def test_M2_T01_tailored_cv_accepts_job_description(client, db):
     assert "Python developer" in db.claude_prompts[0]
 
 
+def test_tailored_cv_strips_placeholder_header_from_claude_output(client, db, monkeypatch):
+    monkeypatch.setattr(
+        "api.routers.tools.call_claude",
+        lambda prompt: "[Candidate Name]\n[Email Address]\n\nPERSONAL STATEMENT\n\nBody text.",
+    )
+    headers = signup(client)
+    response = client.post("/tools/tailored-cv", data={"job_description": "Python developer"}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["result"].startswith("PERSONAL STATEMENT")
+    assert "[Candidate Name]" not in response.json()["result"]
+
+
 # S-B.2 – Cover Letter Generator
 
 def test_S2_T01_generate_and_save_cover_letter(client, db):
@@ -363,7 +475,50 @@ def test_S2_T02_T03_selected_tone_used(client, db, tone):
 
 # S-B.4 – LinkedIn Message Generator
 
-def test_S4_T02_prompt_enforces_character_limit():
-    # The 300-character limit is only enforced via the prompt, so this checks the instruction is present.
+def test_S4_T02_prompt_states_character_limit():
     prompt = build_linkedin_prompt({"target_role": "Engineer"}, "")
     assert "300 characters" in prompt
+
+
+def test_S4_T02_message_kept_within_limit(client, db, monkeypatch):
+    monkeypatch.setattr("api.routers.tools.call_claude", lambda prompt: "Too long. " * 60)
+    headers = signup(client)
+    response = client.post("/tools/linkedin-message", json={"context": "Hiring manager at Acme"}, headers=headers)
+    assert response.status_code == 200
+    assert len(response.json()["message_text"]) <= 300
+
+
+# Startup
+
+def test_startup_runs_init_db(monkeypatch):
+    calls = []
+    monkeypatch.setattr("api.main.init_db", lambda: calls.append(1))
+    with TestClient(app) as started:
+        assert started.get("/health").status_code == 200
+    assert calls == [1]
+
+
+def test_startup_survives_init_db_failure(monkeypatch):
+    def broken():
+        raise RuntimeError("database unreachable")
+    monkeypatch.setattr("api.main.init_db", broken)
+    with TestClient(app) as started:
+        assert started.get("/health").status_code == 200
+
+
+def test_S5_T04_supported_statuses_only(client, db):
+    headers = signup(client)
+    app_id = add_application(client, headers)
+
+    for status in ["Applied", "Interview", "Offer", "Rejected"]:
+        assert client.put(f"/tools/applications/{app_id}", json={"status": status}, headers=headers).status_code == 200
+    bad_update = client.put(f"/tools/applications/{app_id}", json={"status": "Ghosted"}, headers=headers)
+    bad_create = client.post(
+        "/tools/applications",
+        json={"company": "Acme", "role": "Engineer", "date_applied": "2026-10-01", "status": "Ghosted"},
+        headers=headers,
+    )
+
+    assert bad_update.status_code == 422
+    assert bad_create.status_code == 422
+    assert db.applications[app_id]["status"] == "Rejected"

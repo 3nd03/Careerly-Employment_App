@@ -13,6 +13,7 @@ import {
   uploadAvatar,
   uploadProfileCv,
 } from '../api/profile'
+import { updateMe, changePassword } from '../api/auth'
 
 const HISTORY_LABELS = {
   skill_gap: 'Skill Gap Analysis',
@@ -25,9 +26,13 @@ const HISTORY_LABELS = {
   career_roadmap: 'Career Roadmap',
   salary_insights: 'Salary Insights',
   tailored_cv: 'Tailored CV Builder',
+  cv_translate: 'CV Translator',
 }
 
 const HISTORY_PREVIEW_LIMIT = 5
+
+const INPUT_CLASS =
+  'mt-1 w-full bg-white border border-card-border rounded-[10px] px-4 py-2.5 text-sm text-body focus:outline-none focus:border-mint transition-colors duration-200'
 
 function formatHistoryContent(content) {
   if (content && typeof content === 'object') {
@@ -106,8 +111,18 @@ export default function Profile() {
   const [cvPreview, setCvPreview] = useState('')
 
   const email = localStorage.getItem('email') || ''
-  const displayName = localStorage.getItem('display_name') || email.split('@')[0] || 'Account'
+  const [displayName, setDisplayName] = useState(
+    () => localStorage.getItem('display_name') || email.split('@')[0] || 'Account'
+  )
   const initial = (displayName[0] || '?').toUpperCase()
+
+  const [nameDraft, setNameDraft] = useState(displayName)
+  const [savingName, setSavingName] = useState(false)
+  const [nameMessage, setNameMessage] = useState('')
+
+  const [passwordFields, setPasswordFields] = useState({ current: '', next: '', confirm: '' })
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState({ text: '', isError: false })
 
   const [fields, setFields] = useState({})
   const [savingProfile, setSavingProfile] = useState(false)
@@ -245,6 +260,55 @@ export default function Profile() {
     }
   }
 
+  async function handleSaveName(e) {
+    e.preventDefault()
+    setNameMessage('')
+    if (!nameDraft.trim()) {
+      setNameMessage('Enter a name.')
+      return
+    }
+    setSavingName(true)
+    try {
+      const user = await updateMe(nameDraft.trim())
+      localStorage.setItem('display_name', user.display_name)
+      setDisplayName(user.display_name)
+      setNameDraft(user.display_name)
+      setNameMessage('Name updated.')
+    } catch {
+      setNameMessage('Could not update your name. Try again.')
+    } finally {
+      setSavingName(false)
+    }
+  }
+
+  async function handleChangePassword(e) {
+    e.preventDefault()
+    const { current, next, confirm } = passwordFields
+    if (next.length < 8) {
+      setPasswordMessage({ text: 'New password must be at least 8 characters.', isError: true })
+      return
+    }
+    if (next !== confirm) {
+      setPasswordMessage({ text: 'New passwords do not match.', isError: true })
+      return
+    }
+    setSavingPassword(true)
+    setPasswordMessage({ text: '', isError: false })
+    try {
+      await changePassword(current, next)
+      setPasswordFields({ current: '', next: '', confirm: '' })
+      setPasswordMessage({ text: 'Password changed. Other devices have been signed out.', isError: false })
+    } catch (err) {
+      const detail = err.response?.data?.detail
+      setPasswordMessage({
+        text: typeof detail === 'string' ? detail : 'Could not change your password. Try again.',
+        isError: true,
+      })
+    } finally {
+      setSavingPassword(false)
+    }
+  }
+
   async function handleSwitch(profileId) {
     await activateProfile(profileId)
     window.location.reload()
@@ -288,8 +352,61 @@ export default function Profile() {
               {avatarError && <p className="text-xs text-red-600 mt-1">{avatarError}</p>}
             </div>
           </div>
-          <div className="mt-4">
-            <PlaceholderNote message="Saving name and password needs a backend endpoint that isn't available yet." />
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSaveName} className="space-y-3">
+              <h3 className="font-bold text-teal text-sm">Name</h3>
+              <div>
+                <label className="text-xs uppercase tracking-wide text-label">Display name</label>
+                <input
+                  type="text"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  maxLength={100}
+                  className={INPUT_CLASS}
+                />
+              </div>
+              {nameMessage && <p className="text-sm text-teal">{nameMessage}</p>}
+              <button
+                type="submit"
+                disabled={savingName}
+                className="bg-mint text-teal rounded-[10px] px-6 py-2.5 font-medium disabled:opacity-50 hover:brightness-90 transition-all duration-200"
+              >
+                {savingName ? 'Saving...' : 'Save name'}
+              </button>
+            </form>
+
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <h3 className="font-bold text-teal text-sm">Password</h3>
+              {[
+                ['current', 'Current password', 'current-password'],
+                ['next', 'New password', 'new-password'],
+                ['confirm', 'Confirm new password', 'new-password'],
+              ].map(([key, label, autoComplete]) => (
+                <div key={key}>
+                  <label className="text-xs uppercase tracking-wide text-label">{label}</label>
+                  <input
+                    type="password"
+                    required
+                    autoComplete={autoComplete}
+                    value={passwordFields[key]}
+                    onChange={(e) => setPasswordFields((prev) => ({ ...prev, [key]: e.target.value }))}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+              ))}
+              {passwordMessage.text && (
+                <p className={`text-sm ${passwordMessage.isError ? 'text-red-600' : 'text-teal'}`}>
+                  {passwordMessage.text}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={savingPassword}
+                className="bg-mint text-teal rounded-[10px] px-6 py-2.5 font-medium disabled:opacity-50 hover:brightness-90 transition-all duration-200"
+              >
+                {savingPassword ? 'Saving...' : 'Change password'}
+              </button>
+            </form>
           </div>
 
           <div className="mt-6 bg-white border-l-[3px] border-mint rounded-r-lg p-4">

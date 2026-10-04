@@ -45,7 +45,20 @@ AWS_SECRET_ACCESS_KEY=your_secret_key
 AWS_REGION=your_region
 DATABASE_URL=postgresql://user:password@host:5432/dbname
 FRONTEND_URL=http://localhost:3000
+# Password reset emails. Production: set RESEND_API_KEY and EMAIL_FROM (a sender on a domain verified in Resend),
+# and FRONTEND_URL to the site's public URL so reset links point at it.
+# RESEND_API_KEY=re_...
+# EMAIL_FROM=Careerly <no-reply@yourdomain.com>
+# Local development without Resend: print reset emails (including the link) in the API's log instead.
+# EMAIL_BACKEND=console
 ```
+
+Password reset sends an email through [Resend](https://resend.com) with a link to `FRONTEND_URL/reset-password?token=...` that works once and expires after 1 hour. To set it up for a deployment:
+
+1. Create a Resend account, add the site's domain, and add the DNS records Resend shows (SPF/DKIM) until the domain shows as verified.
+2. Create an API key and set `RESEND_API_KEY`, `EMAIL_FROM` (an address on that domain) and `FRONTEND_URL` on the server.
+
+Without `RESEND_API_KEY` no email is sent and the API logs `email not configured`. For local development, set `EMAIL_BACKEND=console` to print the email (and the reset link) in the API's log instead. The forgot-password response is the same whether or not the email is registered.
 
 ## Running the app
 

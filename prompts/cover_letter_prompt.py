@@ -26,10 +26,9 @@ TONE: {tone} - {tone_instruction}
 Instructions:
 - Always write the complete cover letter itself. Never ask the candidate for more information, never explain what is missing, never respond with anything other than the finished letter.
 - If a profile field is marked "Not provided", write around it using what is available rather than commenting on the gap.
-- Write a complete cover letter ready to send. No section labels, no placeholders, no commentary.
-- Open with a strong, specific first paragraph that references the role and employer from the job description.
-- Reference the candidate's actual skills, background, and experience where relevant.
-- Address specific requirements or keywords from the job description directly.
+- Start directly with the salutation (e.g. "Dear Hiring Manager,"). Do not include a letterhead, date, or address block, and never use placeholder brackets such as [Your Name], [Your Address], or [Email Address] for any detail that is not in the profile above; simply leave it out rather than guessing or inventing one.
+- Reference the candidate's actual skills, background, and experience where relevant, but do not inflate them. If the profile describes a skill as "basic", "limited", or "familiar with", describe it at that same level rather than implying regular, confident, or advanced use. Do not claim experience with a specific tool or technology named in the job description unless it also appears in the profile; where the candidate lacks something the role asks for, it is fine to lean on genuinely related experience or express enthusiasm to learn it, but never state or imply they already have it.
+- Address specific requirements or keywords from the job description directly, honestly, and without overstating the candidate's fit.
 - Write in the tone described above, consistently throughout. Avoid generic phrases and corporate clichés regardless of tone.
 - Three to four paragraphs. Concise and targeted.
 - Close with a clear call to action.

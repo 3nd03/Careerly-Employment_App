@@ -9,7 +9,7 @@
 // The account must already exist with a profile - smoke.py --ui creates one and cleans it up.
 // Screenshots: .claude/skills/run-cv-platform/out/*.png
 import { createRequire } from 'node:module'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -98,6 +98,66 @@ try {
     await page.waitForLoadState('networkidle')
     if ((await row().count()) !== 0) throw new Error('row still present after delete + reload')
     await shot('tracker-deleted')
+
+    step('profile: rename updates the sidebar')
+    await page.goto(`${WEB}/profile`)
+    await page.waitForSelector('text=Display name')
+    const nameInput = page.locator('form', { hasText: 'Display name' }).locator('input')
+    await nameInput.fill('Renamed Smoke')
+    await page.click('button:has-text("Save name")')
+    await page.waitForSelector('text=Name updated.')
+    await page.reload()
+    await page.waitForSelector('text=Display name')
+    if ((await nameInput.inputValue()) !== 'Renamed Smoke') throw new Error('name did not persist after reload')
+    if ((await page.locator('aside, nav').filter({ hasText: 'Renamed Smoke' }).count()) === 0) {
+      throw new Error('sidebar does not show the new name')
+    }
+
+    step('profile: wrong current password is rejected, correct one changes it')
+    const pwForm = page.locator('form', { hasText: 'Current password' })
+    const pwInputs = pwForm.locator('input[type="password"]')
+    await pwInputs.nth(0).fill('wrong-password')
+    await pwInputs.nth(1).fill('newpassword456')
+    await pwInputs.nth(2).fill('newpassword456')
+    await page.click('button:has-text("Change password")')
+    await page.waitForSelector('text=Current password is incorrect')
+    // The browser logs the deliberate 400 as a console error; drop just that one.
+    const expected = errors.findIndex((e) => e.includes('400'))
+    if (expected !== -1) errors.splice(expected, 1)
+    await pwInputs.nth(0).fill(password)
+    await page.click('button:has-text("Change password")')
+    await page.waitForSelector('text=Password changed.')
+    await shot('profile-account')
+
+    step('forgot password: generic message, emailed link resets the password')
+    const context = await browser.newContext()
+    const anon = await context.newPage()
+    await anon.goto(`${WEB}/forgot-password`)
+    await anon.fill('input[type="email"]', email)
+    await anon.click('button[type="submit"]')
+    await anon.waitForSelector("text=we've sent a link to reset your password")
+    await anon.screenshot({ path: path.join(out, 'forgot-password.png') })
+    // start.sh runs the API with EMAIL_BACKEND=console, so the email (with the link) lands in api.log.
+    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const linkPattern = new RegExp(String.raw`to=${escapedEmail}[\s\S]*?(http://\S+/reset-password\?token=[\w-]+)`)
+    let link
+    for (let i = 0; i < 20 && !link; i++) {
+      link = readFileSync(path.join(out, 'api.log'), 'utf8').match(linkPattern)?.[1]
+      if (!link) await anon.waitForTimeout(250)
+    }
+    if (!link) throw new Error('no reset link for this user in out/api.log (is the API running with EMAIL_BACKEND=console?)')
+    await anon.goto(link)
+    const resetInputs = anon.locator('input[type="password"]')
+    await resetInputs.nth(0).fill('resetpassword789')
+    await resetInputs.nth(1).fill('resetpassword789')
+    await anon.click('button:has-text("Reset password")')
+    await anon.waitForURL('**/login')
+    await anon.fill('input[type="email"]', email)
+    await anon.fill('input[type="password"]', 'resetpassword789')
+    await anon.click('button[type="submit"]')
+    await anon.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 15000 })
+    step('logged in with the reset password')
+    await context.close()
   }
 
   if (errors.length) throw new Error(`browser errors: ${errors.join(' | ')}`)

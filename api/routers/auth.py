@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
 from database.db_client import (
@@ -7,11 +7,14 @@ from database.db_client import (
     update_user,
     create_remember_token,
     delete_remember_token,
+    delete_other_remember_tokens,
+    delete_all_remember_tokens,
     create_password_reset_token,
     get_user_by_reset_token,
     delete_reset_token,
 )
 from services.auth_service import hash_password, verify_password
+from services.email_service import send_password_reset_email
 from api.schemas import (
     SignupRequest,
     LoginRequest,
@@ -20,6 +23,8 @@ from api.schemas import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     ResetPasswordRequest,
+    UpdateMeRequest,
+    ChangePasswordRequest,
 )
 from api.dependencies import security, get_current_user
 
@@ -57,20 +62,41 @@ def get_me(user: dict = Depends(get_current_user)):
     return user
 
 
-RESET_TOKEN_NOTE = (
-    "If that email is registered, a reset token has been generated. "
-    "Email sending is not yet configured. Use this token to reset your password."
-)
+@router.put("/me", response_model=UserOut)
+def update_me(payload: UpdateMeRequest, user: dict = Depends(get_current_user)):
+    update_user(user["id"], display_name=payload.display_name)
+    return {**user, "display_name": payload.display_name}
+
+
+@router.post("/change-password")
+def change_password(
+    payload: ChangePasswordRequest,
+    user: dict = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    if not verify_password(payload.current_password, user["password_hash"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    update_user(user["id"], password_hash=hash_password(payload.new_password))
+    delete_other_remember_tokens(user["id"], credentials.credentials)
+    return {"detail": "Password changed"}
+
+
+RESET_REQUESTED_NOTE = "If that email is registered, password reset instructions have been sent."
+
+
+def _send_reset_email_if_registered(email: str) -> None:
+    user = get_user_by_email(email)
+    if not user:
+        return
+    token = create_password_reset_token(user["id"])
+    send_password_reset_email(user["email"], token)
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
-def forgot_password(payload: ForgotPasswordRequest):
-    email = payload.email.strip().lower()
-    user = get_user_by_email(email)
-    if not user:
-        return ForgotPasswordResponse(detail=RESET_TOKEN_NOTE)
-    token = create_password_reset_token(user["id"])
-    return ForgotPasswordResponse(detail=RESET_TOKEN_NOTE, reset_token=token)
+def forgot_password(payload: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    # All lookups happen after the response, so registered and unknown emails look identical (content and timing).
+    background_tasks.add_task(_send_reset_email_if_registered, payload.email.strip().lower())
+    return ForgotPasswordResponse(detail=RESET_REQUESTED_NOTE)
 
 
 @router.post("/reset-password")
@@ -80,4 +106,5 @@ def reset_password(payload: ResetPasswordRequest):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
     update_user(user["id"], password_hash=hash_password(payload.new_password))
     delete_reset_token(payload.token)
+    delete_all_remember_tokens(user["id"])
     return {"detail": "Password has been reset"}

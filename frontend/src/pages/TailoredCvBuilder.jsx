@@ -43,6 +43,7 @@ export default function TailoredCvBuilder() {
       <style>{`
         @media print {
           body * { visibility: hidden; }
+          aside { display: none !important; }
           #tailored-cv-preview, #tailored-cv-preview * { visibility: visible; }
           #tailored-cv-preview {
             position: absolute;
@@ -107,7 +108,8 @@ export default function TailoredCvBuilder() {
 
       {result && (
         <>
-          <Card className="mt-6 print:hidden">
+          {/* Not print:hidden - display:none would also remove the preview; the print CSS hides everything else. */}
+          <Card className="mt-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-3">
                 <h2 className="font-bold text-teal text-sm">Your Tailored CV</h2>

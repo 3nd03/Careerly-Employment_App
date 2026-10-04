@@ -7,22 +7,17 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [resetToken, setResetToken] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setMessage('')
-    setResetToken('')
     setLoading(true)
     try {
-      const { reset_token } = await forgotPassword(email.trim().toLowerCase())
+      await forgotPassword(email.trim().toLowerCase())
       setMessage(
-        'If that email is registered, a reset token has been generated. For now, copy it from the API response and use it below.'
+        "If that email is registered, we've sent a link to reset your password. It expires in 1 hour, so check your inbox (and spam folder)."
       )
-      if (reset_token) {
-        setResetToken(reset_token)
-      }
     } catch {
       setError('Could not process that request. Try again.')
     } finally {
@@ -46,17 +41,6 @@ export default function ForgotPassword() {
         {message ? (
           <div>
             <p className="text-sm text-body">{message}</p>
-            {resetToken && (
-              <div className="mt-4">
-                <label className="text-xs uppercase tracking-wide text-label">Reset token</label>
-                <code className="mt-1 block w-full bg-white border border-mint-border rounded-lg px-4 py-2 text-sm text-teal break-all">
-                  {resetToken}
-                </code>
-              </div>
-            )}
-            <Link to="/reset-password" className="block text-center text-teal font-medium mt-6 text-sm">
-              Go to reset password form
-            </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -75,7 +59,7 @@ export default function ForgotPassword() {
               disabled={loading}
               className="w-full bg-mint text-teal rounded-lg py-2.5 font-medium disabled:opacity-50"
             >
-              {loading ? 'Requesting...' : 'Request reset token'}
+              {loading ? 'Sending...' : 'Send reset link'}
             </button>
           </form>
         )}

@@ -12,7 +12,10 @@ if curl -sf localhost:8000/health >/dev/null 2>&1 || curl -sf localhost:5173 >/d
   exit 1
 fi
 
-(cd "$ROOT" && nohup ./venv/Scripts/python -m uvicorn api.main:app --port 8000 > "$OUT/api.log" 2>&1 &)
+# Reset links point at this Vite port, and emails are logged (never sent) even if .env has a Resend key -
+# load_dotenv doesn't override variables that are already set, and an empty key disables Resend.
+(cd "$ROOT" && FRONTEND_URL=http://localhost:5173 EMAIL_BACKEND=console RESEND_API_KEY= \
+  nohup ./venv/Scripts/python -m uvicorn api.main:app --port 8000 > "$OUT/api.log" 2>&1 &)
 (cd "$ROOT/frontend" && nohup npm run dev -- --port 5173 --strictPort > "$OUT/web.log" 2>&1 &)
 
 for _ in $(seq 1 60); do

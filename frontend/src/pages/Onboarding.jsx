@@ -174,7 +174,9 @@ export default function Onboarding() {
     )
   }
 
-  const progressPct = ((step + 1) / QUESTIONS.length) * 100
+  // step counts completed questions, not the one currently shown, so the bar starts at 0%
+  // (not 1/11) and only reaches 100% once the last question has been answered and submitted.
+  const progressPct = (step / QUESTIONS.length) * 100
   const isPrefilled = prefilledKeys.has(key)
 
   return (

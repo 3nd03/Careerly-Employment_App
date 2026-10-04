@@ -46,7 +46,7 @@ It never calls Claude.
 | What | Checks |
 |---|---|
 | API | invalid signup email → 422; signup/login; wrong password → 401; application add/update/delete; no token → 401; other user's application → 404 and hidden from their list; blank job description → 422 (cover letter) / 400 (tailored CV) |
-| `--ui` default flow | signup page shows "Please enter a valid email address." for `a@b`; login lands on `/dashboard`; tracker add → status Offer → reload persists → delete → reload gone; fails on any browser console error |
+| `--ui` default flow | signup page shows "Please enter a valid email address." for `a@b`; login lands on `/dashboard`; tracker add → status Offer → reload persists → delete → reload gone; profile rename shows in sidebar; wrong current password rejected, correct one changes it; forgot-password shows the generic message, the emailed link (read from `out/api.log`) resets the password, and the new password logs in; fails on any unexpected browser console error |
 | `--ui <page> ...` | logs in and screenshots each page (e.g. `dashboard profile`); fails on console errors |
 
 Screenshots → `.claude/skills/run-cv-platform/out/*.png` (a `failure.png` is written on error).
@@ -69,10 +69,14 @@ cd frontend && npm run dev                                  # http://localhost:5
 ./venv/Scripts/python -m pytest -q
 ```
 
-Fast, offline (DB, S3 and Claude are faked in `tests/test_api.py`). 63 passed at time of writing.
+Fast, offline (DB, S3 and Claude are faked in `tests/test_api.py`). 101 passed at time of writing.
 
 ## Gotchas
 
+- **`start.sh` runs uvicorn without `--reload`.** Editing backend code (`api/`, `database/`, `prompts/`,
+  `services/`, `utils/`) after the server is already up does nothing until you restart it: `bash stop.sh &&
+  bash start.sh`. Bitten by this once - ran a real-Claude verification against stale code and it looked like
+  a fix hadn't worked, when actually the old process was still serving the old code.
 - **Smoke tests write to the shared dev database.** The cleanup is in a `finally`, but if the process is
   killed mid-run, delete leftovers: `DELETE FROM users WHERE email LIKE 'smoketest-%@example.com'`.
 - **Claude-backed endpoints cost money** - the scripts deliberately stop before any `call_claude`
@@ -91,10 +95,18 @@ Fast, offline (DB, S3 and Claude are faked in `tests/test_api.py`). 63 passed at
   `pip check` lists them as "not supported on this platform". Fix by reinstalling the same versions:
   `./venv/Scripts/python -m pip install --force-reinstall --no-deps <pkg>==<version>`. Always install
   with `./venv/Scripts/python -m pip`, never a bare `pip`.
-- **Schema isn't migrated automatically** - nothing calls `init_db()`. When the code adds a table, the
-  live DB won't have it until someone runs `./venv/Scripts/python -c "from database.db_client import init_db; init_db()"`
-  (only `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`, safe to re-run). On 2026-10-04
-  `tailored_cv_results` and `password_reset_tokens` were missing, which made `GET /profile/history` 500.
+- **`init_db()` runs on every API start** (`api/main.py` lifespan; all statements are `IF NOT EXISTS`). If the
+  DB is unreachable it logs `init_db failed on startup` and the API still starts. Tests use `TestClient(app)`
+  without `with`, so the startup hook never touches the real DB during `pytest`.
+- **`start.sh` runs the API with `EMAIL_BACKEND=console`, `RESEND_API_KEY=` (empty) and
+  `FRONTEND_URL=http://localhost:5173`**, so reset emails are printed to `out/api.log` and never sent, even if
+  `.env` has a Resend key (`load_dotenv` doesn't override variables that are already set). Started any other
+  way, the API sends via Resend if `RESEND_API_KEY` is set, otherwise logs `email not configured`.
+- **Vite's own port is 3000** (`frontend/vite.config.js`); the skill runs it on 5173 with `--port`. Reset links
+  fall back to `http://localhost:3000` when `FRONTEND_URL` is unset.
+- **The Tailored CV "Download as PDF" is `window.print()`**, not a file download. Headless Chrome can't open the
+  print dialog; check the print layout with `page.emulateMedia({ media: 'print' })` + `page.pdf()`. Mock
+  `**/tools/tailored-cv` with `page.route` to test it without a Claude call.
 
 ## Troubleshooting
 
@@ -102,5 +114,7 @@ Fast, offline (DB, S3 and Claude are faked in `tests/test_api.py`). 63 passed at
 - **`API not reachable at http://localhost:8000`**: run `start.sh` first; if it timed out, read `out/api.log`.
 - **`UI FAILED: browser errors: Access to XMLHttpRequest at 'http://localhost:8000/profile/history' ... blocked by CORS policy`**:
   a 500 from the API (see the CORS gotcha). It was `psycopg2.errors.UndefinedTable: relation "tailored_cv_results" does not exist` - fixed by running `init_db()` (see Gotchas).
+- **Claude-backed endpoints intermittently 500 with `httpx.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] ... self-signed certificate in certificate chain`**
+  in `out/api.log`: something on this machine/network intercepts HTTPS to api.anthropic.com. Retrying succeeded; it's not app code.
 - **`ValueError: the environment variable is longer than 32767 characters`** (pytest on Windows): a
   `parametrize` case containing a huge value became the test ID - give it `ids=[...]`.

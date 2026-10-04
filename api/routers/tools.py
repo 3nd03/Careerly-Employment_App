@@ -25,7 +25,9 @@ from database.db_client import (
 )
 from utils.pdf import extract_pdf_text, generate_pdf
 from utils.ats_check import check_ats_compatibility
+from utils.cv_cleanup import strip_placeholder_cv_header
 from utils.file_validation import validate_pdf
+from utils.linkedin_limit import enforce_limit
 
 from prompts.skill_gap_prompt import build_skill_gap_prompt
 from prompts.cv_prompt import build_cv_prompt
@@ -122,7 +124,7 @@ def run_job_roles(profile: dict = Depends(get_current_profile)):
 def run_linkedin_message(payload: LinkedInRequest, profile: dict = Depends(get_current_profile)):
     context = (payload.context or "").strip()
     prompt = build_linkedin_prompt(profile["data"], context)
-    message_text = call_claude(prompt)
+    message_text = enforce_limit(call_claude(prompt), call_claude)
     save_linkedin_message(profile["id"], context, message_text)
     return {"message_text": message_text}
 
@@ -206,7 +208,7 @@ async def run_tailored_cv(
         validate_pdf(file_bytes, cv_file.filename)
         resolved_cv_text = extract_pdf_text(io.BytesIO(file_bytes)).strip()
     prompt = build_tailored_cv_prompt(profile["data"], job_description, resolved_cv_text)
-    result = call_claude(prompt)
+    result = strip_placeholder_cv_header(call_claude(prompt))
     ats_compatible = check_ats_compatibility(result)
     save_tailored_cv(profile["id"], job_description, result)
     return TailoredCvResponse(result=result, ats_compatible=ats_compatible)

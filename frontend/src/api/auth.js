@@ -29,3 +29,16 @@ export async function resetPassword(token, newPassword) {
   const { data } = await client.post('/auth/reset-password', { token, new_password: newPassword })
   return data
 }
+
+export async function updateMe(displayName) {
+  const { data } = await client.put('/auth/me', { display_name: displayName })
+  return data
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  const { data } = await client.post('/auth/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  })
+  return data
+}

@@ -160,3 +160,24 @@ def test_db_connection_closed_after_operation(mock_get_conn):
 
     mock_conn.close.assert_called_once()
     mock_cur.close.assert_called_once()
+
+
+def test_cv_translate_is_in_result_tables():
+    # Regression: cv_translate was missing from RESULT_TABLES, so translations never appeared
+    # in GET /profile/history even though save_cv_translation wrote them to the database.
+    from database.db_client import RESULT_TABLES
+    assert RESULT_TABLES["cv_translate"] == "cv_translations"
+
+
+@patch("database.db_client.get_connection")
+def test_get_history_queries_cv_translations_table(mock_get_conn):
+    from database.db_client import get_history
+    mock_conn, mock_cur = make_mock_conn()
+    mock_cur.fetchall.return_value = []
+    mock_get_conn.return_value = mock_conn
+
+    get_history("cv_translate", 7)
+
+    sql, params = mock_cur.execute.call_args.args
+    assert "cv_translations" in str(sql)
+    assert params == (7,)

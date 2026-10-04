@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
@@ -29,11 +30,24 @@ class ForgotPasswordRequest(BaseModel):
 
 class ForgotPasswordResponse(BaseModel):
     detail: str
-    reset_token: str | None = None
 
 
 class ResetPasswordRequest(BaseModel):
     token: str
+    new_password: str = Field(min_length=8)
+
+
+class UpdateMeRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=100)
+
+    @field_validator("display_name", mode="before")
+    @classmethod
+    def strip_display_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
     new_password: str = Field(min_length=8)
 
 
@@ -155,11 +169,14 @@ class CVTranslateRequest(BaseModel):
     target_language: str
 
 
+ApplicationStatus = Literal["Applied", "Interview", "Offer", "Rejected"]
+
+
 class ApplicationCreate(BaseModel):
     company: str
     role: str
     date_applied: date
-    status: str = "Applied"
+    status: ApplicationStatus = "Applied"
 
 
 class ApplicationOut(BaseModel):
@@ -173,7 +190,7 @@ class ApplicationOut(BaseModel):
 
 
 class ApplicationStatusUpdate(BaseModel):
-    status: str
+    status: ApplicationStatus
 
 
 class InterviewFeedbackRequest(BaseModel):

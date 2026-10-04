@@ -1,5 +1,5 @@
 import os
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
