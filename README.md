@@ -213,7 +213,7 @@ The Claude API is pay-per-token, so cost tracks usage rather than sitting at a f
 - This is a working prototype built for a charity hackathon, not yet hardened for production deployment.
 - No automatic data retention/expiry policy: data is kept until a user deletes their account themselves.
 - Password reset emails require a Resend account and a verified sending domain; without one configured, reset tokens are created but never delivered.
-- Not yet load-tested under concurrent/production-level traffic.
+- Only lightly load-tested so far: `scripts/load_test.py` runs 20 concurrent workers against the DB-backed endpoints (`/auth/me`, `/profile`, `/profile/all`, `/profile/history`) for 10 seconds, never the Claude-calling ones, since hammering those concurrently would spend real API money on a test rather than a feature. Result: no errors, but latency rises well before it breaks anything, worst on `/profile/history` (p50 ~2.1s, p95 ~2.8s at that concurrency), because `database/db_client.py` opens a new Postgres connection on every call instead of pooling them. Pooling looks like the fix, but a first attempt at it made things six times slower under the same test by starving the request thread pool, so it needs a bigger change (one connection per request, not per DB call) than this prototype has had time for.
 - Rate limiting is in-memory and per-process, so it resets on restart and wouldn't hold across multiple server instances; fine for this single-process prototype, not for a scaled deployment.
 
 ## Roadmap
