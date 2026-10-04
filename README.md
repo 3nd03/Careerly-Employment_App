@@ -190,7 +190,7 @@ scripts/               Manual scripts that hit real infrastructure (DB, S3) to v
 
 - Uploaded CV PDFs and avatars are stored in S3.
 - Everything else (accounts, profiles, and every tool's results) is stored in RDS Postgres. A user can hold multiple profiles (e.g. different target roles); one is marked active at a time, and every result table keys off `profile_id`.
-- Login is by account (email/password), not a browser session. A signed, server-validated token in a cookie keeps a user logged in for 30 days without re-entering credentials.
+- Login is by account (email/password), not a browser session. A signed, server-validated token keeps a user logged in for 30 days without re-entering credentials.
 
 ## Accessibility, security and cost
 
@@ -200,7 +200,7 @@ Runs in the browser with no install required, works with whatever device someone
 
 **Security**
 
-API keys and AWS credentials live in `.env`, which is never committed. The AWS IAM user is scoped to only the S3 and RDS access it needs. Passwords are hashed with bcrypt, never stored in plain text. The persistent login cookie holds an opaque, randomly generated token that's checked against the database on every use, not the user's credentials themselves, and is invalidated server-side on logout. RDS only accepts connections from specific whitelisted IP addresses. The API restricts cross-origin requests to known frontend origins, sets standard hardening response headers (nosniff, frame-options, HSTS, etc.), and rate-limits both the auth endpoints (brute-force protection) and every Claude-calling endpoint (cost control) per IP.
+API keys and AWS credentials live in `.env`, which is never committed. The AWS IAM user is scoped to only the S3 and RDS access it needs. Passwords are hashed with bcrypt, never stored in plain text. The persistent login token is an opaque, randomly generated value that's checked against the database on every use, not the user's credentials themselves, and is invalidated server-side on logout. RDS only accepts connections from specific whitelisted IP addresses. The API restricts cross-origin requests to known frontend origins, sets standard hardening response headers (nosniff, frame-options, HSTS, etc.), and rate-limits both the auth endpoints (brute-force protection) and every Claude-calling endpoint (cost control) per IP.
 
 Account signup requires agreeing to the Privacy Policy, and a user can permanently delete their account, profiles, and all saved results (including S3 files) from Profile → Danger Zone.
 
