@@ -25,6 +25,7 @@ class FakeDB:
         self.cover_letters = []
         self.claude_prompts = []
         self.sent_emails = []
+        self.deleted_s3_keys = []
 
     # users and tokens
     def create_user(self, email, password_hash, display_name):
@@ -80,6 +81,17 @@ class FakeDB:
     def get_active_profile(self, user_id):
         return self.profiles.get(user_id)
 
+    def get_s3_keys_for_user(self, user_id):
+        return [f"cvs/{user_id}/cv.pdf"]
+
+    def delete_user(self, user_id):
+        self.users.pop(user_id, None)
+        self.profiles.pop(user_id, None)
+        self.tokens = {t: uid for t, uid in self.tokens.items() if uid != user_id}
+
+    def delete_objects(self, keys):
+        self.deleted_s3_keys.extend(keys)
+
     # applications
     def save_application(self, profile_id, company, role, date_applied, status):
         app_id = len(self.applications) + 1
@@ -128,6 +140,7 @@ def db(monkeypatch):
             "create_user", "get_user_by_email", "create_remember_token", "delete_remember_token",
             "delete_other_remember_tokens", "delete_all_remember_tokens", "send_password_reset_email",
             "create_password_reset_token", "get_user_by_reset_token", "delete_reset_token", "update_user",
+            "get_s3_keys_for_user", "delete_user", "delete_objects",
         ],
         "api.routers.tools": [
             "save_application", "get_applications", "update_application_status", "delete_application",
@@ -152,7 +165,10 @@ def client():
 
 
 def signup(client, email="user@example.com", password="password123"):
-    response = client.post("/auth/signup", json={"email": email, "password": password, "display_name": "Test"})
+    response = client.post(
+        "/auth/signup",
+        json={"email": email, "password": password, "display_name": "Test", "consent": True},
+    )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
@@ -184,6 +200,15 @@ def test_M3_T02_invalid_email_rejected(client, db, email):
 def test_M3_T02_email_is_trimmed_and_lowercased(client, db):
     signup(client, email="  User@Example.com ")
     assert db.get_user_by_email("user@example.com") is not None
+
+
+def test_M3_T02_signup_without_consent_rejected(client, db):
+    response = client.post(
+        "/auth/signup",
+        json={"email": "user@example.com", "password": "password123", "consent": False},
+    )
+    assert response.status_code == 400
+    assert db.users == {}
 
 
 def test_M3_T03_login_after_logout(client, db):
@@ -295,6 +320,31 @@ def test_change_password_wrong_current_password(client, db):
 def test_change_password_requires_login(client, db):
     response = client.post("/auth/change-password", json={"current_password": "a", "new_password": "newpassword456"})
     assert response.status_code in (401, 403)
+
+
+def test_delete_account_removes_user_and_s3_objects(client, db):
+    headers = signup(client)
+    user_id = db.get_user_by_email("user@example.com")["id"]
+
+    response = client.delete("/auth/me", headers=headers)
+
+    assert response.status_code == 200
+    assert db.get_user_by_email("user@example.com") is None
+    assert db.deleted_s3_keys == [f"cvs/{user_id}/cv.pdf"]
+    assert client.get("/auth/me", headers=headers).status_code == 401
+
+
+def test_delete_account_requires_login(client, db):
+    assert client.delete("/auth/me").status_code in (401, 403)
+
+
+def test_login_rate_limited_after_repeated_attempts(client, db):
+    signup(client)
+    for _ in range(10):
+        client.post("/auth/login", json={"email": "user@example.com", "password": "wrong-password"})
+
+    response = client.post("/auth/login", json={"email": "user@example.com", "password": "wrong-password"})
+    assert response.status_code == 429
 
 
 def test_N_T03_duplicate_account_rejected(client, db):

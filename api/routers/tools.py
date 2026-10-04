@@ -43,6 +43,7 @@ from prompts.tailored_cv_prompt import build_tailored_cv_prompt
 from prompts.interview_feedback_prompt import build_interview_feedback_prompt
 
 from api.dependencies import get_current_profile
+from api.rate_limit import rate_limit
 from api.schemas import (
     SkillGapRequest,
     CoverLetterRequest,
@@ -60,6 +61,9 @@ from api.schemas import (
 )
 
 router = APIRouter(prefix="/tools", tags=["tools"])
+
+# Caps cost from runaway/abusive usage of the Claude-calling endpoints below.
+CLAUDE_RATE_LIMIT = Depends(rate_limit(20, 3600))  # 20 calls per hour per IP
 
 
 def _parse_labeled(text: str, labels: list[str]) -> dict:
@@ -79,7 +83,7 @@ def _parse_labeled(text: str, labels: list[str]) -> dict:
     return sections
 
 
-@router.post("/skill-gap")
+@router.post("/skill-gap", dependencies=[CLAUDE_RATE_LIMIT])
 def run_skill_gap(payload: SkillGapRequest = SkillGapRequest(), profile: dict = Depends(get_current_profile)):
     prompt = build_skill_gap_prompt(profile["data"], payload.job_description)
     response = call_claude(prompt)
@@ -88,7 +92,7 @@ def run_skill_gap(payload: SkillGapRequest = SkillGapRequest(), profile: dict = 
     return result
 
 
-@router.post("/cv-analyse")
+@router.post("/cv-analyse", dependencies=[CLAUDE_RATE_LIMIT])
 async def run_cv_analyse(file: UploadFile = File(...), profile: dict = Depends(get_current_profile)):
     file_bytes = await file.read()
     validate_pdf(file_bytes, file.filename)
@@ -101,7 +105,7 @@ async def run_cv_analyse(file: UploadFile = File(...), profile: dict = Depends(g
     return {"result": result}
 
 
-@router.post("/cover-letter")
+@router.post("/cover-letter", dependencies=[CLAUDE_RATE_LIMIT])
 def run_cover_letter(payload: CoverLetterRequest, profile: dict = Depends(get_current_profile)):
     prompt = build_cover_letter_prompt(profile["data"], payload.job_description, payload.tone)
     letter_text = call_claude(prompt)
@@ -109,7 +113,7 @@ def run_cover_letter(payload: CoverLetterRequest, profile: dict = Depends(get_cu
     return {"letter_text": letter_text}
 
 
-@router.post("/job-roles")
+@router.post("/job-roles", dependencies=[CLAUDE_RATE_LIMIT])
 def run_job_roles(profile: dict = Depends(get_current_profile)):
     latest_skill_gap = get_latest("skill_gap", profile["id"])
     missing_skills = latest_skill_gap["result"].get("MISSING_SKILLS", "") if latest_skill_gap else ""
@@ -120,7 +124,7 @@ def run_job_roles(profile: dict = Depends(get_current_profile)):
     return result
 
 
-@router.post("/linkedin-message")
+@router.post("/linkedin-message", dependencies=[CLAUDE_RATE_LIMIT])
 def run_linkedin_message(payload: LinkedInRequest, profile: dict = Depends(get_current_profile)):
     context = (payload.context or "").strip()
     prompt = build_linkedin_prompt(profile["data"], context)
@@ -129,7 +133,7 @@ def run_linkedin_message(payload: LinkedInRequest, profile: dict = Depends(get_c
     return {"message_text": message_text}
 
 
-@router.post("/interview-prep")
+@router.post("/interview-prep", dependencies=[CLAUDE_RATE_LIMIT])
 def run_interview_prep(profile: dict = Depends(get_current_profile)):
     latest_skill_gap = get_latest("skill_gap", profile["id"])
     missing_skills = latest_skill_gap["result"].get("MISSING_SKILLS", "") if latest_skill_gap else ""
@@ -139,14 +143,14 @@ def run_interview_prep(profile: dict = Depends(get_current_profile)):
     return {"result": result}
 
 
-@router.post("/interview-feedback", response_model=InterviewFeedbackResponse)
+@router.post("/interview-feedback", response_model=InterviewFeedbackResponse, dependencies=[CLAUDE_RATE_LIMIT])
 def run_interview_feedback(payload: InterviewFeedbackRequest, profile: dict = Depends(get_current_profile)):
     prompt = build_interview_feedback_prompt(payload.question, payload.answer)
     feedback = call_claude(prompt)
     return InterviewFeedbackResponse(feedback=feedback)
 
 
-@router.post("/cv-download")
+@router.post("/cv-download", dependencies=[CLAUDE_RATE_LIMIT])
 def run_cv_download(payload: CVDownloadRequest, profile: dict = Depends(get_current_profile)):
     prompt = build_cv_download_prompt(payload.cv_text)
     result = call_claude(prompt)
@@ -159,7 +163,7 @@ def run_cv_download(payload: CVDownloadRequest, profile: dict = Depends(get_curr
     )
 
 
-@router.post("/career-roadmap")
+@router.post("/career-roadmap", dependencies=[CLAUDE_RATE_LIMIT])
 def run_career_roadmap(profile: dict = Depends(get_current_profile)):
     latest_skill_gap = get_latest("skill_gap", profile["id"])
     skill_gap_result = latest_skill_gap["result"] if latest_skill_gap else None
@@ -170,7 +174,7 @@ def run_career_roadmap(profile: dict = Depends(get_current_profile)):
     return result
 
 
-@router.post("/salary-insights")
+@router.post("/salary-insights", dependencies=[CLAUDE_RATE_LIMIT])
 def run_salary_insights(profile: dict = Depends(get_current_profile)):
     prompt = build_salary_insights_prompt(profile["data"])
     response = call_claude(prompt)
@@ -179,7 +183,7 @@ def run_salary_insights(profile: dict = Depends(get_current_profile)):
     return result
 
 
-@router.post("/cv-translate")
+@router.post("/cv-translate", dependencies=[CLAUDE_RATE_LIMIT])
 def run_cv_translate(payload: CVTranslateRequest, profile: dict = Depends(get_current_profile)):
     prompt = build_cv_translator_prompt(payload.cv_text, payload.target_language)
     result = call_claude(prompt)
@@ -192,7 +196,7 @@ def run_cv_translate(payload: CVTranslateRequest, profile: dict = Depends(get_cu
     )
 
 
-@router.post("/tailored-cv", response_model=TailoredCvResponse)
+@router.post("/tailored-cv", response_model=TailoredCvResponse, dependencies=[CLAUDE_RATE_LIMIT])
 async def run_tailored_cv(
     job_description: str = Form(...),
     cv_text: str = Form(""),
@@ -244,7 +248,7 @@ def remove_application(application_id: int, profile: dict = Depends(get_current_
     return {"detail": "Application deleted"}
 
 
-@router.post("/followup", response_model=FollowupResponse)
+@router.post("/followup", response_model=FollowupResponse, dependencies=[CLAUDE_RATE_LIMIT])
 def run_followup(payload: FollowupRequest, profile: dict = Depends(get_current_profile)):
     prompt = (
         f"Here is the user's result from this tool: {payload.previous_result}\n\n"

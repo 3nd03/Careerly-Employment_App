@@ -8,6 +8,7 @@ export default function Signup() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [consent, setConsent] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -23,10 +24,14 @@ export default function Signup() {
       setError('Passwords do not match.')
       return
     }
+    if (!consent) {
+      setError('You must agree to the Privacy Policy to create an account.')
+      return
+    }
 
     setLoading(true)
     try {
-      const { access_token } = await signup({ email, password, display_name: displayName })
+      const { access_token } = await signup({ email, password, display_name: displayName, consent })
       localStorage.setItem('token', access_token)
       localStorage.setItem('email', email.trim().toLowerCase())
       if (displayName.trim()) {
@@ -98,6 +103,20 @@ export default function Signup() {
               className="mt-1 w-full bg-white border border-mint-border rounded-lg px-4 py-2 text-body focus:outline-none focus:border-mint"
             />
           </div>
+          <label className="flex items-start gap-2 text-sm text-body">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              I agree to the{' '}
+              <Link to="/privacy-policy" target="_blank" className="text-teal font-medium underline">
+                Privacy Policy
+              </Link>
+            </span>
+          </label>
           <button
             type="submit"
             disabled={loading}

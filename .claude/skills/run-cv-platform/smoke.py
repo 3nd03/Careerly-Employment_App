@@ -59,7 +59,7 @@ def run_api_checks():
 
     headers = {}
     for role, email in emails.items():
-        r = check(f"signup {role}", client.post("/auth/signup", json={"email": email, "password": PASSWORD, "display_name": "Smoke"}), 200)
+        r = check(f"signup {role}", client.post("/auth/signup", json={"email": email, "password": PASSWORD, "display_name": "Smoke", "consent": True}), 200)
         headers[role] = {"Authorization": f"Bearer {r.json()['access_token']}"}
         check(f"create profile {role}", client.post("/profile", json={"target_role": "Engineer", "label": "smoke"}, headers=headers[role]), 200)
 

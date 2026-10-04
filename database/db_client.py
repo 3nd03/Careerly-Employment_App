@@ -47,6 +47,7 @@ _TABLE_BY_FUNC = {
     "delete_application": "applications",
     "create_remember_token": "remember_tokens",
     "delete_remember_token": "remember_tokens",
+    "delete_user": "users",
     "save_tailored_cv": "tailored_cv_results",
     "create_password_reset_token": "password_reset_tokens",
     "delete_reset_token": "password_reset_tokens",
@@ -96,6 +97,7 @@ def init_db():
             avatar_s3_key TEXT,
             created_at TIMESTAMP DEFAULT NOW()
         );
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS consented_at TIMESTAMP;
         CREATE TABLE IF NOT EXISTS profiles (
             id SERIAL PRIMARY KEY,
             user_id INT REFERENCES users(id) ON DELETE CASCADE,
@@ -215,7 +217,8 @@ def create_user(email: str, password_hash: str, display_name: str = "") -> int:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO users (email, password_hash, display_name) VALUES (%s, %s, %s) RETURNING id;",
+        """INSERT INTO users (email, password_hash, display_name, consented_at)
+           VALUES (%s, %s, %s, NOW()) RETURNING id;""",
         (email, password_hash, display_name),
     )
     user_id = cur.fetchone()[0]
@@ -260,6 +263,43 @@ def update_user(user_id: int, **fields) -> None:
         f"UPDATE users SET {set_clause} WHERE id = %s;",
         (*updates.values(), user_id),
     )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def get_s3_keys_for_user(user_id: int) -> list[str]:
+    """All CV and avatar S3 keys this user owns, across every profile. Used to clean up
+    S3 before the user row (and its cascade-deleted profiles) are removed."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT DISTINCT key FROM (
+            SELECT cv_s3_key AS key FROM profiles WHERE user_id = %s AND cv_s3_key IS NOT NULL
+            UNION
+            SELECT cu.s3_key AS key FROM cv_uploads cu
+            JOIN profiles p ON p.id = cu.profile_id
+            WHERE p.user_id = %s AND cu.s3_key IS NOT NULL
+            UNION
+            SELECT avatar_s3_key AS key FROM users WHERE id = %s AND avatar_s3_key IS NOT NULL
+        ) AS keys;
+        """,
+        (user_id, user_id, user_id),
+    )
+    keys = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return keys
+
+
+@_log_db_write
+def delete_user(user_id: int) -> None:
+    """Deletes the user row. Every profile, result table, and token table references
+    users/profiles with ON DELETE CASCADE, so this removes all of that user's data."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM users WHERE id = %s;", (user_id,))
     conn.commit()
     cur.close()
     conn.close()

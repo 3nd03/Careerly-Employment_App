@@ -13,7 +13,7 @@ import {
   uploadAvatar,
   uploadProfileCv,
 } from '../api/profile'
-import { updateMe, changePassword } from '../api/auth'
+import { updateMe, changePassword, deleteAccount } from '../api/auth'
 
 const HISTORY_LABELS = {
   skill_gap: 'Skill Gap Analysis',
@@ -130,6 +130,10 @@ export default function Profile() {
 
   const [allProfiles, setAllProfiles] = useState([])
   const [renameDrafts, setRenameDrafts] = useState({})
+
+  const [deleteConfirming, setDeleteConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const [history, setHistory] = useState(null)
   const [historyError, setHistoryError] = useState('')
@@ -319,6 +323,19 @@ export default function Profile() {
     if (!label?.trim()) return
     await renameProfile(profileId, label.trim())
     refreshProfiles()
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await deleteAccount()
+      localStorage.clear()
+      navigate('/signup')
+    } catch {
+      setDeleteError('Could not delete your account. Try again.')
+      setDeleting(false)
+    }
   }
 
   return (
@@ -587,6 +604,46 @@ export default function Profile() {
               })}
             </div>
           )}
+        </section>
+
+        <Divider />
+
+        <section id="danger-zone">
+          <h2 className="font-bold text-red-600 mb-4 text-sm uppercase tracking-wide">Danger Zone</h2>
+          <div className="bg-white border-l-[3px] border-red-400 rounded-r-lg p-4">
+            <p className="text-body text-sm">
+              Permanently delete your account, every profile, and every saved result. This cannot be undone.
+            </p>
+            {deleteError && <p className="text-sm text-red-600 mt-2">{deleteError}</p>}
+            {!deleteConfirming ? (
+              <button
+                type="button"
+                onClick={() => setDeleteConfirming(true)}
+                className="mt-3 border border-red-300 text-red-600 bg-white rounded-[10px] px-4 py-2 text-sm transition-colors duration-200"
+              >
+                Delete my account
+              </button>
+            ) : (
+              <div className="mt-3 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deleting}
+                  className="bg-red-600 text-white rounded-[10px] px-4 py-2 text-sm disabled:opacity-50 transition-colors duration-200"
+                >
+                  {deleting ? 'Deleting...' : 'Yes, delete everything'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirming(false)}
+                  disabled={deleting}
+                  className="border border-card-border text-teal bg-white rounded-[10px] px-4 py-2 text-sm transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
         </section>
       </Card>
     </Layout>

@@ -37,8 +37,11 @@ from api.schemas import (
     LatestSkillGapResponse,
 )
 from api.dependencies import get_current_user, get_current_profile
+from api.rate_limit import rate_limit
 
 router = APIRouter(prefix="/profile", tags=["profile"])
+
+CLAUDE_RATE_LIMIT = Depends(rate_limit(20, 3600))  # 20 calls per hour per IP
 
 CV_EXTRACTABLE_KEYS = ["target_role", "current_skills", "background", "experience", "tools", "location"]
 
@@ -60,7 +63,7 @@ def _parse_extracted(raw: str) -> dict:
     return {key: str(parsed.get(key) or "") for key in CV_EXTRACTABLE_KEYS}
 
 
-@router.post("/cv-prefill", response_model=CVPrefillResponse)
+@router.post("/cv-prefill", response_model=CVPrefillResponse, dependencies=[CLAUDE_RATE_LIMIT])
 async def cv_prefill(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
     file_bytes = await file.read()
     validate_pdf(file_bytes, file.filename)

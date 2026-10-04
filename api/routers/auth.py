@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -12,9 +14,13 @@ from database.db_client import (
     create_password_reset_token,
     get_user_by_reset_token,
     delete_reset_token,
+    get_s3_keys_for_user,
+    delete_user,
 )
 from services.auth_service import hash_password, verify_password
 from services.email_service import send_password_reset_email
+from services.s3_client import delete_objects
+from api.rate_limit import rate_limit
 from api.schemas import (
     SignupRequest,
     LoginRequest,
@@ -30,18 +36,27 @@ from api.dependencies import security, get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+logger = logging.getLogger(__name__)
 
-@router.post("/signup", response_model=TokenResponse)
+AUTH_RATE_LIMIT = Depends(rate_limit(10, 300))  # 10 attempts per 5 minutes per IP
+
+
+@router.post("/signup", response_model=TokenResponse, dependencies=[AUTH_RATE_LIMIT])
 def signup(payload: SignupRequest):
     email = payload.email.strip().lower()
     if get_user_by_email(email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists")
+    if not payload.consent:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must agree to the Privacy Policy to create an account",
+        )
     user_id = create_user(email, hash_password(payload.password), payload.display_name.strip())
     token = create_remember_token(user_id)
     return TokenResponse(access_token=token)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[AUTH_RATE_LIMIT])
 def login(payload: LoginRequest):
     email = payload.email.strip().lower()
     user = get_user_by_email(email)
@@ -92,14 +107,14 @@ def _send_reset_email_if_registered(email: str) -> None:
     send_password_reset_email(user["email"], token)
 
 
-@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+@router.post("/forgot-password", response_model=ForgotPasswordResponse, dependencies=[AUTH_RATE_LIMIT])
 def forgot_password(payload: ForgotPasswordRequest, background_tasks: BackgroundTasks):
     # All lookups happen after the response, so registered and unknown emails look identical (content and timing).
     background_tasks.add_task(_send_reset_email_if_registered, payload.email.strip().lower())
     return ForgotPasswordResponse(detail=RESET_REQUESTED_NOTE)
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", dependencies=[AUTH_RATE_LIMIT])
 def reset_password(payload: ResetPasswordRequest):
     user = get_user_by_reset_token(payload.token)
     if not user:
@@ -108,3 +123,14 @@ def reset_password(payload: ResetPasswordRequest):
     delete_reset_token(payload.token)
     delete_all_remember_tokens(user["id"])
     return {"detail": "Password has been reset"}
+
+
+@router.delete("/me")
+def delete_account(user: dict = Depends(get_current_user)):
+    s3_keys = get_s3_keys_for_user(user["id"])
+    delete_user(user["id"])  # cascades to profiles, results, and tokens
+    try:
+        delete_objects(s3_keys)
+    except Exception:
+        logger.warning("Could not delete S3 objects for deleted user %s", user["id"])
+    return {"detail": "Account deleted"}

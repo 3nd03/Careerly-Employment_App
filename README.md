@@ -4,7 +4,7 @@ An AI-powered CV and career platform built for a charity hackathon. Users go thr
 
 ## Features
 
-- **Accounts**: email/password signup and login, with a 30-day persistent session so returning users don't have to log in every visit.
+- **Accounts**: email/password signup (requires agreeing to the Privacy Policy) and login, with a 30-day persistent session so returning users don't have to log in every visit. A user can permanently delete their account, profiles, and all saved results from the Profile page's Danger Zone.
 - **CV-based prefill**: onboarding opens with an optional CV upload. Claude extracts what it can (role, skills, background, experience, tools, location) into an editable review form, so the chatbot only asks what a CV can't answer.
 - **Onboarding chatbot**: 11 questions covering target role, skills, background, experience, goals, and any disabilities or access needs. Every other tool uses the profile this builds.
 - **Profile page**: inline editing of any profile field, account settings (name, avatar, password), multiple saved profiles per account (e.g. different target roles) with a switcher and rename, and a history view of past results per tool.
@@ -200,7 +200,9 @@ Runs in the browser with no install required, works with whatever device someone
 
 **Security**
 
-API keys and AWS credentials live in `.env`, which is never committed. The AWS IAM user is scoped to only the S3 and RDS access it needs. Passwords are hashed with bcrypt, never stored in plain text. The persistent login cookie holds an opaque, randomly generated token that's checked against the database on every use, not the user's credentials themselves, and is invalidated server-side on logout. RDS only accepts connections from specific whitelisted IP addresses.
+API keys and AWS credentials live in `.env`, which is never committed. The AWS IAM user is scoped to only the S3 and RDS access it needs. Passwords are hashed with bcrypt, never stored in plain text. The persistent login cookie holds an opaque, randomly generated token that's checked against the database on every use, not the user's credentials themselves, and is invalidated server-side on logout. RDS only accepts connections from specific whitelisted IP addresses. The API restricts cross-origin requests to known frontend origins, sets standard hardening response headers (nosniff, frame-options, HSTS, etc.), and rate-limits both the auth endpoints (brute-force protection) and every Claude-calling endpoint (cost control) per IP.
+
+Account signup requires agreeing to the Privacy Policy, and a user can permanently delete their account, profiles, and all saved results (including S3 files) from Profile → Danger Zone.
 
 **Cost**
 
@@ -209,9 +211,10 @@ The Claude API is pay-per-token, so cost tracks usage rather than sitting at a f
 ## Known limitations
 
 - This is a working prototype built for a charity hackathon, not yet hardened for production deployment.
-- No formal consent flow or data retention/deletion policy yet. Worth adding before handling real users' CVs at scale, since they contain personal data.
+- No automatic data retention/expiry policy: data is kept until a user deletes their account themselves.
 - Password reset emails require a Resend account and a verified sending domain; without one configured, reset tokens are created but never delivered.
 - Not yet load-tested under concurrent/production-level traffic.
+- Rate limiting is in-memory and per-process, so it resets on restart and wouldn't hold across multiple server instances; fine for this single-process prototype, not for a scaled deployment.
 
 ## Roadmap
 

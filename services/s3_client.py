@@ -36,3 +36,12 @@ def get_avatar_url(key, expires_in=3600):
         Params={"Bucket": os.getenv("S3_BUCKET_NAME"), "Key": key},
         ExpiresIn=expires_in,
     )
+
+def delete_objects(keys):
+    if not keys:
+        return
+    s3 = get_s3_client()
+    s3.delete_objects(
+        Bucket=os.getenv("S3_BUCKET_NAME"),
+        Delete={"Objects": [{"Key": key} for key in keys]},
+    )
