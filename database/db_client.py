@@ -496,23 +496,33 @@ def get_applications(profile_id: int) -> list[dict]:
 
 
 @_log_db_write
-def update_application_status(application_id: int, status: str) -> None:
+def update_application_status(application_id: int, profile_id: int, status: str) -> bool:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("UPDATE applications SET status = %s WHERE id = %s;", (status, application_id))
+    cur.execute(
+        "UPDATE applications SET status = %s WHERE id = %s AND profile_id = %s;",
+        (status, application_id, profile_id),
+    )
+    updated = cur.rowcount > 0
     conn.commit()
     cur.close()
     conn.close()
+    return updated
 
 
 @_log_db_write
-def delete_application(application_id: int) -> None:
+def delete_application(application_id: int, profile_id: int) -> bool:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM applications WHERE id = %s;", (application_id,))
+    cur.execute(
+        "DELETE FROM applications WHERE id = %s AND profile_id = %s;",
+        (application_id, profile_id),
+    )
+    deleted = cur.rowcount > 0
     conn.commit()
     cur.close()
     conn.close()
+    return deleted
 
 
 @_log_db_write

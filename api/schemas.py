@@ -1,11 +1,16 @@
 from datetime import date, datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class SignupRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str = Field(min_length=8)
     display_name: str = ""
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def strip_email(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class LoginRequest(BaseModel):
@@ -123,8 +128,13 @@ class SkillGapRequest(BaseModel):
 
 
 class CoverLetterRequest(BaseModel):
-    job_description: str
+    job_description: str = Field(min_length=1)
     tone: str = "Formal"
+
+    @field_validator("job_description", mode="before")
+    @classmethod
+    def strip_job_description(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class LinkedInRequest(BaseModel):

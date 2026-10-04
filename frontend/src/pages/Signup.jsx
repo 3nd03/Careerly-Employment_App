@@ -34,7 +34,14 @@ export default function Signup() {
       }
       navigate('/onboarding')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not create an account.')
+      const detail = err.response?.data?.detail
+      if (typeof detail === 'string') {
+        setError(detail)
+      } else if (Array.isArray(detail) && detail.some((d) => d.loc?.includes('email'))) {
+        setError('Please enter a valid email address.')
+      } else {
+        setError('Could not create an account.')
+      }
     } finally {
       setLoading(false)
     }

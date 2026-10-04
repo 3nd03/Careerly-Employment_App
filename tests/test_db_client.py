@@ -122,16 +122,32 @@ def test_update_profile_cv_stores_s3_key_and_text(mock_get_conn):
 
 
 @patch("database.db_client.get_connection")
-def test_delete_application_removes_by_id(mock_get_conn):
+def test_delete_application_removes_by_id_and_profile(mock_get_conn):
     from database.db_client import delete_application
     mock_conn, mock_cur = make_mock_conn()
+    mock_cur.rowcount = 1
     mock_get_conn.return_value = mock_conn
 
-    delete_application(3)
+    assert delete_application(3, 7) is True
 
     sql, params = mock_cur.execute.call_args.args
     assert "applications" in sql
-    assert 3 in params
+    assert "profile_id" in sql
+    assert params == (3, 7)
+
+
+@patch("database.db_client.get_connection")
+def test_update_application_status_scoped_to_profile(mock_get_conn):
+    from database.db_client import update_application_status
+    mock_conn, mock_cur = make_mock_conn()
+    mock_cur.rowcount = 0
+    mock_get_conn.return_value = mock_conn
+
+    assert update_application_status(3, 7, "Offer") is False
+
+    sql, params = mock_cur.execute.call_args.args
+    assert "profile_id" in sql
+    assert params == ("Offer", 3, 7)
 
 
 @patch("database.db_client.get_connection")

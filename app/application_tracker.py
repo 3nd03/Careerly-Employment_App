@@ -65,7 +65,7 @@ def run_application_tracker() -> None:
         )
         if new_status != application["status"]:
             try:
-                update_application_status(application["id"], new_status)
+                update_application_status(application["id"], profile_id, new_status)
                 st.rerun()
             except Exception:
                 st.warning("Could not update status in the database.")

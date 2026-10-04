@@ -1,6 +1,6 @@
 import io
 
-from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 
 from services.claude_client import call_claude
 from services.s3_client import upload_cv
@@ -197,6 +197,9 @@ async def run_tailored_cv(
     cv_file: UploadFile | None = File(None),
     profile: dict = Depends(get_current_profile),
 ):
+    job_description = job_description.strip()
+    if not job_description:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job description is required")
     resolved_cv_text = cv_text
     if cv_file is not None:
         file_bytes = await cv_file.read()
@@ -222,14 +225,20 @@ def add_application(payload: ApplicationCreate, profile: dict = Depends(get_curr
 
 
 @router.put("/applications/{application_id}")
-def update_application(application_id: int, payload: ApplicationStatusUpdate):
-    update_application_status(application_id, payload.status)
+def update_application(
+    application_id: int,
+    payload: ApplicationStatusUpdate,
+    profile: dict = Depends(get_current_profile),
+):
+    if not update_application_status(application_id, profile["id"], payload.status):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
     return {"detail": "Status updated"}
 
 
 @router.delete("/applications/{application_id}")
-def remove_application(application_id: int):
-    delete_application(application_id)
+def remove_application(application_id: int, profile: dict = Depends(get_current_profile)):
+    if not delete_application(application_id, profile["id"]):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
     return {"detail": "Application deleted"}
 
 
