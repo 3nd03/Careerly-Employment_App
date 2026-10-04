@@ -208,10 +208,10 @@ The Claude API is pay-per-token, so cost tracks usage rather than sitting at a f
 
 ## Known limitations
 
-- Built in a single day. This is a working prototype, not a production system.
-- No consent flow, data retention policy, or way for a user to request their data be deleted. Needed before any real deployment, since CVs contain personal data.
+- This is a working prototype built for a charity hackathon, not yet hardened for production deployment.
+- No formal consent flow or data retention/deletion policy yet. Worth adding before handling real users' CVs at scale, since they contain personal data.
 - Password reset emails require a Resend account and a verified sending domain; without one configured, reset tokens are created but never delivered.
-- Built with one user in mind at a time, not tested under concurrent load.
+- Not yet load-tested under concurrent/production-level traffic.
 
 ## Roadmap
 
