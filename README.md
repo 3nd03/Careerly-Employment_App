@@ -10,7 +10,7 @@ An AI-powered CV and career platform built for a charity hackathon. Users go thr
 - **Profile page**: inline editing of any profile field, account settings (name, avatar, password), multiple saved profiles per account (e.g. different target roles) with a switcher and rename, and a history view of past results per tool.
 - **Dashboard**: profile summary, skill gap score, and links to all tools in one place.
 - **Skill gap analysis**: match score against the target role, what the user already has, what they're missing, and concrete next steps.
-- **CV analyser**: upload a PDF CV (text extracted with PyPDF2) for a structured review covering overall impression, strengths, weaknesses, and specific rewrite suggestions.
+- **CV analyser**: upload a PDF CV (text extracted with pypdf) for a structured review covering overall impression, strengths, weaknesses, and specific rewrite suggestions.
 - **Cover letter generator**: takes the user profile and a pasted job description and produces a tailored cover letter.
 - **Job role suggestions**: three roles to go for now, three to aim for in six months.
 - **LinkedIn message generator**: short cold outreach message built from the user profile, with an optional context field for who they're messaging.
@@ -104,7 +104,6 @@ Find this machine's LAN IP (`ipconfig` on Windows, look for IPv4 Address) and op
 ## Running tests
 
 ```bash
-pip install pytest
 pytest
 ```
 
@@ -135,6 +134,7 @@ services/
   claude_client.py     Single call_claude(prompt, system=""): all API calls go here
   s3_client.py         AWS S3 storage, handles CV PDFs and avatar uploads
   auth_service.py      Password hashing/verification (bcrypt)
+  email_service.py     Transactional email (password reset) via Resend
 
 database/
   db_client.py         RDS Postgres: users, profiles, and per-tool result history
@@ -151,10 +151,16 @@ prompts/
   salary_insights_prompt.py
   cv_download_prompt.py
   cv_translator_prompt.py
+  tailored_cv_prompt.py
+  interview_feedback_prompt.py
 
 utils/
   helpers.py           Shared profile rendering and navigation helpers
   pdf.py               PDF text extraction, shared by CV Analyser and onboarding prefill
+  ats_check.py         Checks a tailored CV against basic ATS formatting rules
+  file_validation.py   PDF upload validation (type, size, content)
+  linkedin_limit.py    Enforces the 300-character LinkedIn connection note limit
+  cv_cleanup.py        Strips a placeholder contact header from a generated CV
 
 api/
   main.py              FastAPI app
@@ -204,7 +210,7 @@ The Claude API is pay-per-token, so cost tracks usage rather than sitting at a f
 
 - Built in a single day. This is a working prototype, not a production system.
 - No consent flow, data retention policy, or way for a user to request their data be deleted. Needed before any real deployment, since CVs contain personal data.
-- No password reset flow. A user who forgets their password currently has no way to recover the account.
+- Password reset emails require a Resend account and a verified sending domain; without one configured, reset tokens are created but never delivered.
 - Built with one user in mind at a time, not tested under concurrent load.
 
 ## Roadmap

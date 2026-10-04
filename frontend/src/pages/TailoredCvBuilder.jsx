@@ -83,7 +83,7 @@ export default function TailoredCvBuilder() {
         </label>
 
         <label className="text-[11px] uppercase tracking-wide text-label mt-4 block">
-          Paste your current CV here (optional — leave blank to use your profile only)
+          Paste your current CV here (optional, leave blank to use your profile only)
         </label>
         <textarea
           rows={8}

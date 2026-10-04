@@ -167,7 +167,7 @@ def add_application(client, headers, company="Acme"):
     return response.json()["id"]
 
 
-# M3 – Account, Sign-up & Secure Login
+# M3 - Account, Sign-up & Secure Login
 
 def test_M3_T01_create_account(client, db):
     headers = signup(client)
@@ -308,7 +308,7 @@ def test_N_T03_short_password_rejected(client, db):
     assert response.status_code == 422
 
 
-# M3-T06 / N-T04 – users can only access their own data
+# M3-T06 / N-T04 - users can only access their own data
 
 def test_N_T04_unauthenticated_requests_rejected(client, db):
     assert client.get("/tools/applications").status_code in (401, 403)
@@ -347,7 +347,7 @@ def test_M3_T06_users_only_see_own_applications(client, db):
     assert client.get("/tools/applications", headers=other).json() == []
 
 
-# S-B.5 – Job Application Tracker
+# S-B.5 - Job Application Tracker
 
 def test_S5_T01_add_application(client, db):
     headers = signup(client)
@@ -381,7 +381,7 @@ def test_S5_T03_delete_missing_application_returns_404(client, db):
     assert client.delete("/tools/applications/999", headers=headers).status_code == 404
 
 
-# M1-T02 / N-T01 – invalid CV files
+# M1-T02 / N-T01 - invalid CV files
 
 @pytest.mark.parametrize(
     "filename, content",
@@ -412,7 +412,7 @@ def test_profile_history_includes_cv_translate_key(client, db):
     assert "cv_translate" in response.json()
 
 
-# N-T05 / N-T06 – generation needs a profile and a job description
+# N-T05 / N-T06 - generation needs a profile and a job description
 
 def test_N_T05_generation_without_profile_rejected(client, db):
     headers = signup(client)
@@ -457,7 +457,7 @@ def test_tailored_cv_strips_placeholder_header_from_claude_output(client, db, mo
     assert "[Candidate Name]" not in response.json()["result"]
 
 
-# S-B.2 – Cover Letter Generator
+# S-B.2 - Cover Letter Generator
 
 def test_S2_T01_generate_and_save_cover_letter(client, db):
     headers = signup(client)
@@ -473,7 +473,7 @@ def test_S2_T02_T03_selected_tone_used(client, db, tone):
     assert f"TONE: {tone}" in db.claude_prompts[0]
 
 
-# S-B.4 – LinkedIn Message Generator
+# S-B.4 - LinkedIn Message Generator
 
 def test_S4_T02_prompt_states_character_limit():
     prompt = build_linkedin_prompt({"target_role": "Engineer"}, "")

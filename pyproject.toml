@@ -3,7 +3,7 @@ name = "cv-platform"
 version = "0.1.0"
 
 [tool.setuptools]
-packages = ["app", "services", "database", "database.migrations", "prompts", "utils", "api", "api.routers"]
+packages = ["app", "services", "database", "prompts", "utils", "api", "api.routers"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

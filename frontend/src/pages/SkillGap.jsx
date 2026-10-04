@@ -43,7 +43,7 @@ export default function SkillGap() {
         <h1 className="text-2xl font-bold text-teal mb-6">Skill Gap Analysis</h1>
 
         <label className="text-[11px] uppercase tracking-wide text-label">
-          Job description (optional — leave blank to match against your target role)
+          Job description (optional, leave blank to match against your target role)
         </label>
         <textarea
           rows={6}
